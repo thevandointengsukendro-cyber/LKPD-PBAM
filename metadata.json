@@ -1,0 +1,6 @@
+{
+  "name": "E-LKPD Digital STYLIST STUDIO - Matematika Kelas VIII",
+  "description": "E-LKPD Interaktif Matematika SMP Fase D Kelas VIII tentang Peluang Teoretis, Frekuensi Relatif, dan Frekuensi Harapan berdasarkan SK Kepala BSKAP Nomor 046/H/KR/2025.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
