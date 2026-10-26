@@ -138,11 +138,11 @@ export default function App() {
       setFeedbackBanner('Luar biasa! Seluruh jawaban tepat (Skor 100/100).');
     } else if (res.score >= 75) {
       setFeedbackBanner(
-        `Bagus sekali! Skor kamu ${res.score}/100 (${res.correctCount}/${res.totalGradable} benar). Periksa kotak berwarna merah untuk menyempurnakan jawaban.`
+        `Bagus sekali! Skor ${res.score}/100 (${res.correctCount}/${res.totalGradable} benar).`
       );
     } else {
       setFeedbackBanner(
-        `Skor saat ini: ${res.score}/100 (${res.correctCount}/${res.totalGradable} benar). Kotak merah menandakan isian yang masih perlu diperbaiki.`
+        `Skor: ${res.score}/100 (${res.correctCount}/${res.totalGradable} benar). Perbaiki kotak merah.`
       );
     }
   };
@@ -332,14 +332,14 @@ export default function App() {
               alignItems: 'center',
               justifyContent: 'center',
               textAlign: 'center',
-              padding: '6px 10px',
+              padding: '6px 12px',
             }}
           >
             <h2
-              className="m-0"
+              className="m-0 whitespace-nowrap"
               style={{
-                fontSize: '16.5px',
-                fontWeight: 700,
+                fontSize: '15.2px',
+                fontWeight: 800,
                 lineHeight: 1.35,
                 color: '#1E3A8A',
               }}
@@ -347,11 +347,12 @@ export default function App() {
               TOPIK: PELUANG TEORETIS, FREKUENSI RELATIF, &amp; FREKUENSI HARAPAN
             </h2>
             <div
+              className="whitespace-nowrap"
               style={{
-                fontSize: '14.5px',
-                fontWeight: 600,
+                fontSize: '14px',
+                fontWeight: 700,
                 color: '#B45309',
-                marginTop: '3px',
+                marginTop: '4px',
               }}
             >
               Petualangan Matematika di Butik Digital &apos;Stylist Studio&apos; (4 JP)
@@ -366,51 +367,61 @@ export default function App() {
               top: '315px',
               width: '520px',
               height: '265px',
-              background: 'linear-gradient(180deg, #FFFBEB 0%, #FDF2F8 100%)',
+              background: 'linear-gradient(180deg, #E0F2FE 0%, #FFFBEB 45%, #FDF2F8 100%)',
               border: '3px solid #1E293B',
               borderRadius: '16px',
               overflow: 'hidden',
             }}
           >
             {/* Atap Kanopi Belang Pink-Putih */}
-            <div className="boutique-canopy" style={{ width: '100%', height: '26px' }} />
+            <div
+              className="boutique-canopy flex items-center justify-between px-3"
+              style={{ width: '100%', height: '26px' }}
+            >
+              <span className="bg-[#3B4252] text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-white">
+                ♦ #GL2 STYLIST STUDIO
+              </span>
+              <span className="bg-[#EC4899] text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-white">
+                DRESS-UP MATH
+              </span>
+            </div>
 
-            {/* Ilustrasi Sampul: Gantungan 3 Kemeja di Kiri, Chibi di Tengah, 2 Celana di Kanan + Balon Teks P(B)=1/6 */}
-            <div className="relative w-full h-[239px] flex items-center justify-between px-4">
-              {/* Kiri: 3 Kemeja (Merah, Biru, Kuning) */}
-              <div className="flex flex-col items-center justify-center bg-[#FEF3C7] border-2 border-[#1E293B] rounded-xl p-2 shadow-sm">
-                <span className="text-[11px] font-extrabold text-[#1E3A8A] mb-1">
-                  3 KEMEJA (M, B, K)
-                </span>
-                <div className="flex items-center gap-1">
-                  <div className="flex flex-col items-center">
-                    <ShirtSvg code="M" width={52} height={50} />
-                    <span className="text-[10px] font-bold text-[#E11D48]">M</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <ShirtSvg code="B" width={52} height={50} />
-                    <span className="text-[10px] font-bold text-[#0284C7]">B</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <ShirtSvg code="K" width={52} height={50} />
-                    <span className="text-[10px] font-bold text-[#CA8A04]">K</span>
-                  </div>
+            {/* Ilustrasi Sampul Gacha Life 2 Style: 3 Kemeja di Kiri, Gacha Chibi di Tengah, 2 Celana di Kanan + Balon P(B)=1/6 */}
+            <div className="relative w-full h-[233px] flex items-center justify-between px-3">
+              {/* Kiri: Gacha Customize Slot - 3 Kemeja (Merah, Biru, Kuning) */}
+              <div
+                style={{ width: '166px' }}
+                className="flex flex-col items-center bg-[#4A4E69] border-2 border-[#1E293B] rounded-xl overflow-hidden shadow-sm"
+              >
+                <div className="w-full bg-[#3B3F58] text-white text-[10px] font-extrabold text-center py-1 border-b border-[#1E293B]">
+                  UPPER: 3 KEMEJA (M, B, K)
+                </div>
+                <div className="flex items-center justify-center gap-1 p-1.5 bg-[#E0E7FF] w-full">
+                  {(['M', 'B', 'K'] as ShirtCode[]).map((c) => (
+                    <div
+                      key={c}
+                      className="flex flex-col items-center bg-white border border-[#4A4E69] rounded-lg p-0.5"
+                    >
+                      <ShirtSvg code={c} width={44} height={42} />
+                      <span className="text-[9.5px] font-extrabold text-[#1E293B]">{c}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Tengah: Karakter Chibi + Balon Teks P(B) = 1/6 */}
+              {/* Tengah: Karakter Chibi Gacha Life 2 + Balon Teks P(B) = 1/6 */}
               <div className="relative flex flex-col items-center justify-center">
                 {/* Balon Teks Lucu */}
                 <div
                   style={{
                     position: 'absolute',
-                    top: '-4px',
-                    right: '-62px',
+                    top: '2px',
+                    right: '-44px',
                     backgroundColor: '#FFFFFF',
                     border: '2.5px solid #1E293B',
                     borderRadius: '14px',
-                    padding: '3px 9px',
-                    fontSize: '12px',
+                    padding: '2px 8px',
+                    fontSize: '11.5px',
                     fontWeight: 800,
                     color: '#1E3A8A',
                     boxShadow: '0 3px 0 #F472B6',
@@ -420,23 +431,27 @@ export default function App() {
                 >
                   <span className="math-var">P(B)</span> = 1/6
                 </div>
-                <ChibiCharacterSvg shirt="M" pants="P" width={136} height={198} />
+                <ChibiCharacterSvg shirt="M" pants="P" width={145} height={212} />
               </div>
 
-              {/* Kanan: 2 Celana (Putih, Hitam) */}
-              <div className="flex flex-col items-center justify-center bg-[#FEF3C7] border-2 border-[#1E293B] rounded-xl p-2 shadow-sm">
-                <span className="text-[11px] font-extrabold text-[#1E3A8A] mb-1">
-                  2 CELANA (P, H)
-                </span>
-                <div className="flex items-center gap-2">
-                  <div className="flex flex-col items-center">
-                    <PantsSvg code="P" width={54} height={52} showHanger />
-                    <span className="text-[10px] font-bold text-slate-700">P</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <PantsSvg code="H" width={54} height={52} showHanger />
-                    <span className="text-[10px] font-bold text-slate-900">H</span>
-                  </div>
+              {/* Kanan: Gacha Customize Slot - 2 Celana (Putih, Hitam) */}
+              <div
+                style={{ width: '138px' }}
+                className="flex flex-col items-center bg-[#4A4E69] border-2 border-[#1E293B] rounded-xl overflow-hidden shadow-sm"
+              >
+                <div className="w-full bg-[#3B3F58] text-white text-[10px] font-extrabold text-center py-1 border-b border-[#1E293B]">
+                  LOWER: 2 CELANA (P, H)
+                </div>
+                <div className="flex items-center justify-center gap-1.5 p-1.5 bg-[#E0E7FF] w-full">
+                  {(['P', 'H'] as PantsCode[]).map((c) => (
+                    <div
+                      key={c}
+                      className="flex flex-col items-center bg-white border border-[#4A4E69] rounded-lg px-1.5 py-0.5"
+                    >
+                      <PantsSvg code={c} width={46} height={42} showHanger />
+                      <span className="text-[9.5px] font-extrabold text-[#1E293B]">{c}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -757,18 +772,19 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '14px 16px',
+              padding: '12px 16px',
+              overflow: 'hidden',
             }}
           >
             <h3
-              className="m-0 mb-2"
-              style={{ fontSize: '16px', fontWeight: 700, color: '#1E3A8A' }}
+              className="m-0 mb-1.5"
+              style={{ fontSize: '15.5px', fontWeight: 700, color: '#1E3A8A' }}
             >
               A. PETUNJUK PENGGUNAAN E-LKPD
             </h3>
             <ol
               className="numbered-list m-0 pl-5 space-y-1"
-              style={{ fontSize: '13.6px', lineHeight: 1.46, color: '#0F172A' }}
+              style={{ fontSize: '13.4px', lineHeight: 1.44, color: '#0F172A' }}
             >
               <li>Berdoalah terlebih dahulu sebelum memulai kegiatan pembelajaran ini.</li>
               <li>Tuliskan nama kelompok, kelas, dan nama anggota kelompok pada halaman sampul.</li>
@@ -792,15 +808,16 @@ export default function App() {
               borderLeft: '5px solid #1E3A8A',
               borderRadius: '10px',
               padding: '12px 16px',
+              overflow: 'hidden',
             }}
           >
             <h3
               className="m-0 mb-1.5"
-              style={{ fontSize: '16px', fontWeight: 700, color: '#1E3A8A' }}
+              style={{ fontSize: '15.5px', fontWeight: 700, color: '#1E3A8A' }}
             >
               B. CAPAIAN &amp; TUJUAN PEMBELAJARAN
             </h3>
-            <div style={{ fontSize: '13px', lineHeight: 1.45, color: '#0F172A' }}>
+            <div style={{ fontSize: '12.9px', lineHeight: 1.44, color: '#0F172A' }}>
               <p className="m-0 mb-2">
                 <strong className="text-[#1E3A8A]">Capaian Pembelajaran (SK BSKAP 046/H/KR/2025):</strong>{' '}
                 &quot;Murid dapat menjelaskan dan menggunakan pengertian peluang dan frekuensi relatif untuk menentukan frekuensi harapan satu kejadian pada suatu percobaan sederhana (semua hasil percobaan dapat muncul secara merata).&quot;
@@ -828,6 +845,7 @@ export default function App() {
               border: '2px solid #FBBF24',
               borderRadius: '10px',
               padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <h3
@@ -838,7 +856,7 @@ export default function App() {
             </h3>
             <ol
               className="numbered-list m-0 pl-5 space-y-1"
-              style={{ fontSize: '12.8px', lineHeight: 1.35, color: '#0F172A' }}
+              style={{ fontSize: '12.6px', lineHeight: 1.34, color: '#0F172A' }}
             >
               <li>
                 <strong>Ruang Sampel (<span className="math-var">S</span>)</strong> adalah himpunan seluruh hasil yang mungkin muncul pada percobaan sederhana. Setiap anggota dari <span className="math-var">S</span> disebut <strong>Titik Sampel</strong>, dan banyak anggota ruang sampel dilambangkan dengan <span className="math-var">n(S)</span>.
@@ -846,7 +864,7 @@ export default function App() {
               <li>
                 <strong>Peluang Teoretis <span className="math-var">P(A)</span></strong> adalah rasio banyaknya kejadian <span className="math-var">A</span> terhadap total anggota ruang sampel:{' '}
                 <span className="math-var">P(A) = n(A) / n(S)</span> ={' '}
-                <span className="fraction" style={{ fontSize: '11.5px', lineHeight: 1.05 }}>
+                <span className="fraction" style={{ fontSize: '11px', lineHeight: 1.02 }}>
                   <span className="num math-var" style={{ padding: '0 4px' }}>n(A)</span>
                   <span className="den math-var" style={{ padding: '0 4px' }}>n(S)</span>
                 </span>.
@@ -854,7 +872,7 @@ export default function App() {
               <li>
                 <strong>Frekuensi Relatif / Peluang Empiris (<span className="math-var">f_r</span>)</strong> adalah perbandingan kemunculan kejadian pada percobaan nyata (<span className="math-var">k</span>) terhadap banyak percobaan (<span className="math-var">N</span>):{' '}
                 <span className="math-var">f_r = k / N</span> ={' '}
-                <span className="fraction" style={{ fontSize: '11.5px', lineHeight: 1.05 }}>
+                <span className="fraction" style={{ fontSize: '11px', lineHeight: 1.02 }}>
                   <span className="num math-var" style={{ padding: '0 4px' }}>k</span>
                   <span className="den math-var" style={{ padding: '0 4px' }}>N</span>
                 </span>.
@@ -877,20 +895,21 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #2563EB',
               borderRadius: '10px',
-              padding: '14px 16px',
+              padding: '12px 16px',
+              overflow: 'hidden',
             }}
           >
             <h3
-              className="m-0 mb-3"
-              style={{ fontSize: '16px', fontWeight: 700, color: '#2563EB' }}
+              className="m-0 mb-2.5"
+              style={{ fontSize: '15.5px', fontWeight: 700, color: '#2563EB' }}
             >
               D. APERSEPSI: MATERI PRASYARAT PECAHAN (TP.P1 &amp; TP.P2)
             </h3>
 
             {/* Baris 1 (TP.P1 - Menyederhanakan Pecahan) */}
             <div
-              className="flex flex-wrap items-center gap-2 mb-4 bg-[#EFF6FF] px-3 py-2 rounded-lg"
-              style={{ fontSize: '14.5px', fontWeight: 600 }}
+              className="flex items-center gap-2 mb-3 bg-[#EFF6FF] px-3 py-1.5 rounded-lg whitespace-nowrap"
+              style={{ fontSize: '14px', fontWeight: 600 }}
             >
               <span>1. Sederhanakan pecahan biasa berikut:</span>
               <span className="fraction">
@@ -906,7 +925,7 @@ export default function App() {
                     value={answers.ap1_num1}
                     onChange={(e) => updateAnswer('ap1_num1', e.target.value)}
                     className={getFieldClass('ap1_num1')}
-                    style={{ width: '42px', height: '26px' }}
+                    style={{ width: '42px', height: '25px' }}
                   />
                 </span>
                 <span className="den">
@@ -916,7 +935,7 @@ export default function App() {
                     value={answers.ap1_den1}
                     onChange={(e) => updateAnswer('ap1_den1', e.target.value)}
                     className={getFieldClass('ap1_den1')}
-                    style={{ width: '42px', height: '26px' }}
+                    style={{ width: '42px', height: '25px' }}
                   />
                 </span>
               </span>
@@ -934,7 +953,7 @@ export default function App() {
                     value={answers.ap1_num2}
                     onChange={(e) => updateAnswer('ap1_num2', e.target.value)}
                     className={getFieldClass('ap1_num2')}
-                    style={{ width: '42px', height: '26px' }}
+                    style={{ width: '42px', height: '25px' }}
                   />
                 </span>
                 <span className="den">
@@ -944,7 +963,7 @@ export default function App() {
                     value={answers.ap1_den2}
                     onChange={(e) => updateAnswer('ap1_den2', e.target.value)}
                     className={getFieldClass('ap1_den2')}
-                    style={{ width: '42px', height: '26px' }}
+                    style={{ width: '42px', height: '25px' }}
                   />
                 </span>
               </span>
@@ -953,8 +972,8 @@ export default function App() {
 
             {/* Baris 2 (TP.P2 - Perkalian Bilangan Bulat dan Pecahan) */}
             <div
-              className="flex flex-wrap items-center gap-2 bg-[#EFF6FF] px-3 py-2 rounded-lg"
-              style={{ fontSize: '14.5px', fontWeight: 600 }}
+              className="flex items-center gap-2 bg-[#EFF6FF] px-3 py-2 rounded-lg whitespace-nowrap"
+              style={{ fontSize: '14px', fontWeight: 600 }}
             >
               <span>2. Hitunglah hasil perkalian berikut:</span>
               <span>30 × (1/6) =</span>
@@ -964,7 +983,7 @@ export default function App() {
                 value={answers.ap2_res1}
                 onChange={(e) => updateAnswer('ap2_res1', e.target.value)}
                 className={getFieldClass('ap2_res1')}
-                style={{ width: '50px', height: '30px' }}
+                style={{ width: '50px', height: '28px' }}
               />
               <span>dan 60 × (1/6) =</span>
               <input
@@ -973,7 +992,7 @@ export default function App() {
                 value={answers.ap2_res2}
                 onChange={(e) => updateAnswer('ap2_res2', e.target.value)}
                 className={getFieldClass('ap2_res2')}
-                style={{ width: '50px', height: '30px' }}
+                style={{ width: '50px', height: '28px' }}
               />
               <span>.</span>
             </div>
@@ -1017,7 +1036,7 @@ export default function App() {
               top: '88px',
               width: '642px',
               height: '365px',
-              background: 'linear-gradient(180deg, #FFFBEB 0%, #FDF2F8 100%)',
+              background: 'linear-gradient(180deg, #E0F2FE 0%, #FFFBEB 50%, #FDF2F8 100%)',
               border: '3px solid #1E293B',
               borderRadius: '16px',
               overflow: 'hidden',
@@ -1029,7 +1048,7 @@ export default function App() {
               style={{ width: '100%', height: '26px' }}
             >
               <span className="bg-[#1E3A8A] text-white text-[11px] font-extrabold px-3 py-0.5 rounded-full border border-white">
-                SIMULATOR INTERAKTIF: STYLIST STUDIO
+                SIMULATOR INTERAKTIF: STYLIST STUDIO (#GL2 EDITION)
               </span>
             </div>
 
@@ -1044,22 +1063,23 @@ export default function App() {
                 backgroundColor: '#FBBF24',
                 border: '2.5px solid #1E293B',
                 borderRadius: '12px',
-                padding: '8px',
+                padding: '6px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
+                overflow: 'hidden',
               }}
             >
-              <div className="text-center text-xs font-extrabold text-[#1E293B] bg-[#FEF3C7] py-1 rounded border border-[#1E293B]">
-                LEMARI BUTIK
+              <div className="text-center text-[11.5px] font-extrabold text-white bg-[#4A4E69] py-1 rounded border border-[#1E293B]">
+                LEMARI BUTIK (CUSTOMIZE)
               </div>
 
-              {/* Rak Atas: 3 Tombol Gantungan SVG Kemeja M, B, K */}
-              <div className="bg-[#FFFBEB] border-2 border-[#1E293B] rounded-lg p-1.5">
-                <div className="text-[10.5px] font-bold text-center text-[#92400E] mb-1">
+              {/* Rak Atas: 3 Tombol Gantungan SVG Kemeja M, B, K (Strictly fitted inside 198px width) */}
+              <div className="bg-[#FFFBEB] border-2 border-[#1E293B] rounded-lg p-1">
+                <div className="text-[10px] font-extrabold text-center text-[#92400E] mb-1">
                   Rak Atas: Pilih 1 dari 3 Kemeja
                 </div>
-                <div className="flex items-center justify-around">
+                <div className="grid grid-cols-3 gap-1">
                   {(['M', 'B', 'K'] as ShirtCode[]).map((code) => {
                     const active = selectedShirt === code;
                     return (
@@ -1068,14 +1088,14 @@ export default function App() {
                         type="button"
                         onClick={() => handleSelectShirt(code)}
                         aria-label={`Pilih Kemeja ${SHIRT_COLORS[code].name} (${code})`}
-                        className={`hanger-btn flex flex-col items-center p-1 rounded-lg border-2 cursor-pointer ${
+                        className={`hanger-btn flex flex-col items-center justify-center py-1 px-0.5 rounded-lg border-2 cursor-pointer ${
                           active
-                            ? 'bg-[#FCE7F3] border-[#EC4899] shadow-sm'
-                            : 'bg-white border-transparent hover:border-slate-300'
+                            ? 'bg-[#FCE7F3] border-[#EC4899] shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-400'
                         }`}
                       >
-                        <ShirtSvg code={code} width={52} height={49} />
-                        <span className="text-[10px] font-extrabold text-[#0F172A]">
+                        <ShirtSvg code={code} width={44} height={42} />
+                        <span className="text-[9.5px] font-extrabold text-[#0F172A] leading-tight whitespace-nowrap">
                           {SHIRT_COLORS[code].name} ({code})
                         </span>
                       </button>
@@ -1085,11 +1105,11 @@ export default function App() {
               </div>
 
               {/* Rak Bawah: 2 Tombol SVG Celana P, H */}
-              <div className="bg-[#FFFBEB] border-2 border-[#1E293B] rounded-lg p-1.5">
-                <div className="text-[10.5px] font-bold text-center text-[#92400E] mb-1">
+              <div className="bg-[#FFFBEB] border-2 border-[#1E293B] rounded-lg p-1">
+                <div className="text-[10px] font-extrabold text-center text-[#92400E] mb-1">
                   Rak Bawah: Pilih 1 dari 2 Celana
                 </div>
-                <div className="flex items-center justify-around">
+                <div className="grid grid-cols-2 gap-1.5 px-2">
                   {(['P', 'H'] as PantsCode[]).map((code) => {
                     const active = selectedPants === code;
                     return (
@@ -1098,14 +1118,14 @@ export default function App() {
                         type="button"
                         onClick={() => handleSelectPants(code)}
                         aria-label={`Pilih Celana ${PANTS_COLORS[code].name} (${code})`}
-                        className={`hanger-btn flex flex-col items-center px-2.5 py-1 rounded-lg border-2 cursor-pointer ${
+                        className={`hanger-btn flex flex-col items-center justify-center py-1 px-1 rounded-lg border-2 cursor-pointer ${
                           active
-                            ? 'bg-[#FCE7F3] border-[#EC4899] shadow-sm'
-                            : 'bg-white border-transparent hover:border-slate-300'
+                            ? 'bg-[#FCE7F3] border-[#EC4899] shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-400'
                         }`}
                       >
-                        <PantsSvg code={code} width={54} height={50} />
-                        <span className="text-[10px] font-extrabold text-[#0F172A]">
+                        <PantsSvg code={code} width={46} height={42} />
+                        <span className="text-[9.5px] font-extrabold text-[#0F172A] leading-tight whitespace-nowrap">
                           {PANTS_COLORS[code].name} ({code})
                         </span>
                       </button>
@@ -1127,10 +1147,10 @@ export default function App() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '6px 0',
+                padding: '4px 0',
               }}
             >
-              <div className="text-center text-xs font-extrabold text-[#1E3A8A] bg-white px-3 py-1 rounded-full border-2 border-[#1E293B] shadow-xs">
+              <div className="text-center text-[11px] font-extrabold text-white bg-[#4A4E69] px-3 py-0.5 rounded-full border-2 border-[#1E293B] shadow-xs">
                 KARAKTER CHIBI
               </div>
 
@@ -1139,14 +1159,14 @@ export default function App() {
                   shirt={selectedShirt}
                   pants={selectedPants}
                   popKey={popKey}
-                  width={152}
-                  height={222}
+                  width={154}
+                  height={224}
                 />
               </div>
 
               <div
                 data-testid="current-outfit-label"
-                className="bg-[#1E3A8A] text-white font-extrabold text-sm px-4 py-1 rounded-full border-2 border-[#1E293B] shadow-sm"
+                className="bg-[#1E3A8A] text-white font-extrabold text-xs px-3.5 py-1 rounded-full border-2 border-[#1E293B] shadow-sm whitespace-nowrap"
               >
                 Outfit: ({selectedShirt}, {selectedPants})
               </div>
@@ -1163,10 +1183,11 @@ export default function App() {
                 backgroundColor: '#FFFFFF',
                 border: '2.5px solid #1E293B',
                 borderRadius: '12px',
-                padding: '8px',
+                padding: '7px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
+                overflow: 'hidden',
               }}
             >
               <div className="text-center text-[11px] font-extrabold text-white bg-[#1E3A8A] py-1 rounded border border-[#1E293B]">
@@ -1174,19 +1195,19 @@ export default function App() {
               </div>
 
               {/* Tombol Kapsul 3D */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={handleRandomizeOne}
-                    className="btn-gacha-1 flex-1 py-1.5 text-xs font-extrabold text-[#0F172A] cursor-pointer"
+                    className="btn-gacha-1 flex-1 py-1 text-xs font-extrabold text-[#0F172A] cursor-pointer whitespace-nowrap"
                   >
                     Acak 1 Kali
                   </button>
                   <button
                     type="button"
                     onClick={handleResetSimulator}
-                    className="btn-reset px-2.5 py-1.5 text-[11px] font-extrabold text-[#0F172A] cursor-pointer"
+                    className="btn-reset px-2 py-1 text-[11px] font-extrabold text-[#0F172A] cursor-pointer whitespace-nowrap"
                   >
                     Reset Data
                   </button>
@@ -1194,7 +1215,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleRandomizeThirty}
-                  className="btn-gacha-30 w-full py-1.5 text-xs font-extrabold cursor-pointer"
+                  className="btn-gacha-30 w-full py-1 text-xs font-extrabold cursor-pointer whitespace-nowrap"
                 >
                   Randomize 30 Kali
                 </button>
@@ -1205,7 +1226,7 @@ export default function App() {
                 <div className="bg-[#EFF6FF] text-[#1E3A8A] text-[10.5px] font-extrabold text-center py-0.5 border-b border-[#1E293B] tabular-nums">
                   Tabel Statistik Real-Time (N = {totalTrials})
                 </div>
-                <table className="w-full text-[11px] border-collapse tabular-nums">
+                <table className="w-full text-[10.5px] border-collapse tabular-nums">
                   <thead>
                     <tr className="bg-slate-100 border-b border-slate-300">
                       <th className="py-0.5 px-2 text-left font-bold">Titik Sampel</th>
@@ -1251,36 +1272,37 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '14px 16px',
+              padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <h3
               className="m-0 mb-1"
-              style={{ fontSize: '16.5px', fontWeight: 700, color: '#1E3A8A' }}
+              style={{ fontSize: '15.8px', fontWeight: 700, color: '#1E3A8A' }}
             >
               1. AKTIVITAS 1: MENDAFTAR RUANG SAMPEL DENGAN TABEL SILANG (TP.D1)
             </h3>
             <p
-              className="m-0 mb-2.5"
-              style={{ fontSize: '13.8px', lineHeight: 1.45, color: '#0F172A' }}
+              className="m-0 mb-2"
+              style={{ fontSize: '13.2px', lineHeight: 1.38, color: '#0F172A' }}
             >
               Cobalah memasangkan 3 kemeja (M, B, K) dan 2 celana (P, H) pada karakter Chibi di atas, lalu lengkapi tabel silang berikut untuk mendaftar seluruh anggota ruang sampel <span className="math-var">S</span>!
             </p>
 
             {/* Tabel Silang 3x2 (Lebar 562px) */}
             <table
-              style={{ width: '562px', margin: '0 auto 10px auto' }}
-              className="border-2 border-[#1E3A8A] border-collapse text-center text-sm"
+              style={{ width: '562px', margin: '0 auto 8px auto' }}
+              className="border-2 border-[#1E3A8A] border-collapse text-center text-[13px]"
             >
               <thead>
                 <tr className="bg-[#1E3A8A] text-white font-bold">
-                  <th className="border border-[#93C5FD] py-1.5 px-3 w-[202px]">
+                  <th className="border border-[#93C5FD] py-1 px-3 w-[202px]">
                     Kemeja \ Celana
                   </th>
-                  <th className="border border-[#93C5FD] py-1.5 px-3 w-[180px]">
+                  <th className="border border-[#93C5FD] py-1 px-3 w-[180px]">
                     Celana Putih (P)
                   </th>
-                  <th className="border border-[#93C5FD] py-1.5 px-3 w-[180px]">
+                  <th className="border border-[#93C5FD] py-1 px-3 w-[180px]">
                     Celana Hitam (H)
                   </th>
                 </tr>
@@ -1288,10 +1310,10 @@ export default function App() {
               <tbody>
                 {/* Baris Kemeja Merah (M) */}
                 <tr>
-                  <td className="border border-slate-300 py-1.5 px-3 font-bold bg-[#FFF1F2] text-left">
+                  <td className="border border-slate-300 py-1 px-3 font-bold bg-[#FFF1F2] text-left">
                     Kemeja Merah (M)
                   </td>
-                  <td className="border border-slate-300 py-1.5 px-3 font-extrabold bg-[#FEF08A]">
+                  <td className="border border-slate-300 py-1 px-3 font-extrabold bg-[#FEF08A]">
                     (M, P)
                   </td>
                   <td className="border border-slate-300 py-1 px-3">
@@ -1302,13 +1324,13 @@ export default function App() {
                       value={answers.act1_MH}
                       onChange={(e) => updateAnswer('act1_MH', e.target.value)}
                       className={getFieldClass('act1_MH')}
-                      style={{ width: '110px', height: '28px' }}
+                      style={{ width: '108px', height: '24px' }}
                     />
                   </td>
                 </tr>
                 {/* Baris Kemeja Biru (B) */}
                 <tr>
-                  <td className="border border-slate-300 py-1.5 px-3 font-bold bg-[#EFF6FF] text-left">
+                  <td className="border border-slate-300 py-1 px-3 font-bold bg-[#EFF6FF] text-left">
                     Kemeja Biru (B)
                   </td>
                   <td className="border border-slate-300 py-1 px-3">
@@ -1319,16 +1341,16 @@ export default function App() {
                       value={answers.act1_BP}
                       onChange={(e) => updateAnswer('act1_BP', e.target.value)}
                       className={getFieldClass('act1_BP')}
-                      style={{ width: '110px', height: '28px' }}
+                      style={{ width: '108px', height: '24px' }}
                     />
                   </td>
-                  <td className="border border-slate-300 py-1.5 px-3 font-extrabold bg-slate-50">
+                  <td className="border border-slate-300 py-1 px-3 font-extrabold bg-slate-50">
                     (B, H)
                   </td>
                 </tr>
                 {/* Baris Kemeja Kuning (K) */}
                 <tr>
-                  <td className="border border-slate-300 py-1.5 px-3 font-bold bg-[#FEFCE8] text-left">
+                  <td className="border border-slate-300 py-1 px-3 font-bold bg-[#FEFCE8] text-left">
                     Kemeja Kuning (K)
                   </td>
                   <td className="border border-slate-300 py-1 px-3">
@@ -1339,7 +1361,7 @@ export default function App() {
                       value={answers.act1_KP}
                       onChange={(e) => updateAnswer('act1_KP', e.target.value)}
                       className={getFieldClass('act1_KP')}
-                      style={{ width: '110px', height: '28px' }}
+                      style={{ width: '108px', height: '24px' }}
                     />
                   </td>
                   <td className="border border-slate-300 py-1 px-3">
@@ -1350,7 +1372,7 @@ export default function App() {
                       value={answers.act1_KH}
                       onChange={(e) => updateAnswer('act1_KH', e.target.value)}
                       className={getFieldClass('act1_KH')}
-                      style={{ width: '110px', height: '28px' }}
+                      style={{ width: '108px', height: '24px' }}
                     />
                   </td>
                 </tr>
@@ -1358,7 +1380,7 @@ export default function App() {
             </table>
 
             {/* Isian di bawah tabel */}
-            <div className="space-y-1.5 text-[14px] font-semibold">
+            <div className="space-y-1 text-[13.4px] font-semibold">
               <div className="flex items-center gap-2">
                 <span>• Banyak seluruh anggota ruang sampel adalah</span>
                 <span className="math-var">n(S)</span>
@@ -1369,7 +1391,7 @@ export default function App() {
                   value={answers.act1_nS}
                   onChange={(e) => updateAnswer('act1_nS', e.target.value)}
                   className={getFieldClass('act1_nS')}
-                  style={{ width: '52px', height: '28px' }}
+                  style={{ width: '48px', height: '25px' }}
                 />
                 <span>pasangan pakaian.</span>
               </div>
@@ -1383,7 +1405,7 @@ export default function App() {
                   value={answers.act1_nB}
                   onChange={(e) => updateAnswer('act1_nB', e.target.value)}
                   className={getFieldClass('act1_nB')}
-                  style={{ width: '52px', height: '28px' }}
+                  style={{ width: '48px', height: '25px' }}
                 />
                 <span>.</span>
               </div>
@@ -1401,26 +1423,27 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '14px 16px',
+              padding: '12px 16px',
+              overflow: 'hidden',
             }}
           >
             <h3
-              className="m-0 mb-1.5"
-              style={{ fontSize: '16.5px', fontWeight: 700, color: '#1E3A8A' }}
+              className="m-0 mb-1"
+              style={{ fontSize: '15.8px', fontWeight: 700, color: '#1E3A8A' }}
             >
               2. AKTIVITAS 2: MENENTUKAN PELUANG TEORETIS P(B) (TP.D2)
             </h3>
             <p
-              className="m-0 mb-2.5"
-              style={{ fontSize: '13.8px', lineHeight: 1.45, color: '#0F172A' }}
+              className="m-0 mb-2"
+              style={{ fontSize: '13.4px', lineHeight: 1.42, color: '#0F172A' }}
             >
               Karena semua pasangan pakaian dapat muncul secara merata, tentukan nilai Peluang Teoretis terpilihnya pasangan Kemeja Merah dan Celana Putih atau <span className="math-var">P(B)</span>!
             </p>
 
             {/* Kotak Rumus Pecahan Vertikal (Latar #F1F5F9) */}
             <div
-              className="flex items-center justify-center gap-3 py-2 px-4 rounded-xl mb-2.5"
-              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '15px', fontWeight: 700 }}
+              className="flex items-center justify-center gap-3 py-1.5 px-4 rounded-xl mb-2"
+              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.5px', fontWeight: 700 }}
             >
               <span>
                 Peluang Teoretis <span className="math-var">P(B)</span> =
@@ -1438,7 +1461,7 @@ export default function App() {
                     value={answers.act2_num}
                     onChange={(e) => updateAnswer('act2_num', e.target.value)}
                     className={getFieldClass('act2_num')}
-                    style={{ width: '50px', height: '26px' }}
+                    style={{ width: '48px', height: '24px' }}
                   />
                 </span>
                 <span className="den">
@@ -1448,21 +1471,21 @@ export default function App() {
                     value={answers.act2_den}
                     onChange={(e) => updateAnswer('act2_den', e.target.value)}
                     className={getFieldClass('act2_den')}
-                    style={{ width: '50px', height: '26px' }}
+                    style={{ width: '48px', height: '24px' }}
                   />
                 </span>
               </span>
             </div>
 
             {/* Kalimat Pemahaman */}
-            <div style={{ fontSize: '13.8px', lineHeight: 1.6, fontWeight: 600 }}>
+            <div style={{ fontSize: '13.4px', lineHeight: 1.55, fontWeight: 600 }}>
               Pengertian peluang teoretis adalah rasio banyaknya titik sampel kejadian{' '}
               <select
                 aria-label="Dropdown Pengertian Peluang Teoretis 1"
                 value={answers.act2_drop1}
                 onChange={(e) => updateAnswer('act2_drop1', e.target.value)}
                 className={getFieldClass('act2_drop1')}
-                style={{ width: '95px', height: '28px', padding: '0 4px' }}
+                style={{ width: '92px', height: '26px', padding: '0 4px' }}
               >
                 <option value="">-- Pilih --</option>
                 <option value="n(B)">n(B)</option>
@@ -1475,7 +1498,7 @@ export default function App() {
                 value={answers.act2_drop2}
                 onChange={(e) => updateAnswer('act2_drop2', e.target.value)}
                 className={getFieldClass('act2_drop2')}
-                style={{ width: '95px', height: '28px', padding: '0 4px' }}
+                style={{ width: '92px', height: '26px', padding: '0 4px' }}
               >
                 <option value="">-- Pilih --</option>
                 <option value="n(B)">n(B)</option>
@@ -1541,24 +1564,25 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <h4
               className="m-0 mb-1"
-              style={{ fontSize: '15.3px', fontWeight: 700, color: '#0F172A' }}
+              style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}
             >
               Bagian 3.1: Perhitungan Frekuensi Harapan Teoretis
             </h4>
             <p
-              className="m-0 mb-2.5"
-              style={{ fontSize: '13.6px', lineHeight: 1.45, color: '#0F172A' }}
+              className="m-0 mb-2"
+              style={{ fontSize: '13.3px', lineHeight: 1.42, color: '#0F172A' }}
             >
               Target Kejadian <span className="math-var">B</span>: Pasangan Kemeja Merah (M) dan Celana Putih (P) dengan <span className="math-var">n(B)</span> = 1 dan <span className="math-var">n(S)</span> = 6, sehingga <span className="math-var">P(B)</span> = 1/6. Hitung nilai Frekuensi Harapan (<span className="math-var">F_h</span>) untuk <span className="math-var">N</span> = 30 kali percobaan:
             </p>
             <div
-              className="flex items-center justify-center gap-2.5 py-2 px-4 rounded-xl"
-              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '15px', fontWeight: 700 }}
+              className="flex items-center justify-center gap-2.5 py-1.5 px-4 rounded-xl"
+              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.5px', fontWeight: 700 }}
             >
               <span>
                 <span className="math-var">F_h</span> = <span className="math-var">N</span> × <span className="math-var">P(B)</span> = 30 ×
@@ -1572,7 +1596,7 @@ export default function App() {
                     value={answers.act31_num}
                     onChange={(e) => updateAnswer('act31_num', e.target.value)}
                     className={getFieldClass('act31_num')}
-                    style={{ width: '46px', height: '26px' }}
+                    style={{ width: '44px', height: '24px' }}
                   />
                 </span>
                 <span className="den">
@@ -1582,7 +1606,7 @@ export default function App() {
                     value={answers.act31_den}
                     onChange={(e) => updateAnswer('act31_den', e.target.value)}
                     className={getFieldClass('act31_den')}
-                    style={{ width: '46px', height: '26px' }}
+                    style={{ width: '44px', height: '24px' }}
                   />
                 </span>
               </span>
@@ -1593,7 +1617,7 @@ export default function App() {
                 value={answers.act31_res}
                 onChange={(e) => updateAnswer('act31_res', e.target.value)}
                 className={getFieldClass('act31_res')}
-                style={{ width: '56px', height: '30px' }}
+                style={{ width: '54px', height: '28px' }}
               />
               <span>kali</span>
             </div>
@@ -1610,30 +1634,31 @@ export default function App() {
               backgroundColor: '#FDF2F8',
               border: '2px solid #EC4899',
               borderRadius: '12px',
-              padding: '10px 16px',
+              padding: '10px 14px',
+              overflow: 'hidden',
             }}
           >
             <h4
-              className="m-0 mb-1"
+              className="m-0 mb-1.5"
               style={{ fontSize: '15px', fontWeight: 700, color: '#9D174D' }}
             >
               Bagian 3.2: Eksperimen Digital (Pengumpulan Data Empiris)
             </h4>
-            <div style={{ fontSize: '13px', lineHeight: 1.4, color: '#0F172A' }} className="space-y-1.5 mb-2">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div style={{ fontSize: '12.6px', lineHeight: 1.4, color: '#0F172A' }} className="space-y-1.5 mb-2">
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <span>
-                  • Tekan tombol &apos;Randomize 30 Kali&apos; pada simulator (atau klik tombol pintas
+                  • Tekan tombol &apos;Randomize 30 Kali&apos; pada simulator (atau klik pintas
                 </span>
                 <button
                   type="button"
                   onClick={handleRandomizeThirty}
-                  className="bg-[#EC4899] hover:bg-[#9D174D] text-white font-bold text-[11.5px] px-2.5 py-0.5 rounded-full border border-[#1E293B] cursor-pointer shadow-xs"
+                  className="bg-[#EC4899] hover:bg-[#9D174D] text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full border border-[#1E293B] cursor-pointer shadow-xs"
                 >
                   Randomize 30 Kali Sekarang
                 </button>
                 <span>di sini)!</span>
               </div>
-              <div className="flex items-center gap-1.5 font-semibold">
+              <div className="flex items-center gap-1.5 font-semibold whitespace-nowrap">
                 <span>
                   • Catat kemunculan aktual pasangan (M, P) dari <span className="math-var">N</span> = 30 kali percobaan: muncul sebanyak <span className="math-var">k</span> =
                 </span>
@@ -1643,7 +1668,7 @@ export default function App() {
                   value={answers.act32_k}
                   onChange={(e) => handleChangeK(e.target.value)}
                   className={getFieldClass('act32_k')}
-                  style={{ width: '50px', height: '26px' }}
+                  style={{ width: '46px', height: '24px' }}
                 />
                 <span>kali.</span>
               </div>
@@ -1652,7 +1677,7 @@ export default function App() {
             {/* Kotak Rumus Frekuensi Relatif (f_r) */}
             <div
               className="flex items-center justify-center gap-2.5 py-1 px-4 rounded-xl bg-white border border-[#F472B6]"
-              style={{ fontSize: '14.5px', fontWeight: 700 }}
+              style={{ fontSize: '14.2px', fontWeight: 700 }}
             >
               <span>
                 <span className="math-var">f_r</span> =
@@ -1670,7 +1695,7 @@ export default function App() {
                     value={answers.act32_num}
                     onChange={(e) => updateAnswer('act32_num', e.target.value)}
                     className={getFieldClass('act32_num')}
-                    style={{ width: '48px', height: '24px' }}
+                    style={{ width: '46px', height: '23px' }}
                   />
                 </span>
                 <span className="den">30</span>
@@ -1689,24 +1714,25 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <h4
               className="m-0 mb-1"
-              style={{ fontSize: '15.3px', fontWeight: 700, color: '#0F172A' }}
+              style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}
             >
               Bagian 3.3: Menentukan Frekuensi Harapan Menggunakan Frekuensi Relatif (<span className="math-var">f_r</span>)
             </h4>
             <p
-              className="m-0 mb-2.5"
-              style={{ fontSize: '13.6px', lineHeight: 1.45, color: '#0F172A' }}
+              className="m-0 mb-2"
+              style={{ fontSize: '13.3px', lineHeight: 1.42, color: '#0F172A' }}
             >
               Gunakan nilai <span className="math-var">f_r</span> yang didapat pada Bagian 3.2 untuk memprediksi kemunculan pasangan (M, P) jika percobaan diperbesar menjadi <span className="math-var">N</span> = 120 kali:
             </p>
             <div
-              className="flex flex-wrap items-center justify-center gap-2 py-2 px-3 rounded-xl"
-              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.5px', fontWeight: 700 }}
+              className="flex items-center justify-center gap-2 py-1.5 px-3 rounded-xl whitespace-nowrap"
+              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.2px', fontWeight: 700 }}
             >
               <span>
                 <span className="math-var">F_h</span>(empiris) = <span className="math-var">N</span> × <span className="math-var">f_r</span> = 120 × (
@@ -1719,7 +1745,7 @@ export default function App() {
                     value={answers.act33_num}
                     onChange={(e) => updateAnswer('act33_num', e.target.value)}
                     className={getFieldClass('act33_num')}
-                    style={{ width: '48px', height: '26px' }}
+                    style={{ width: '46px', height: '24px' }}
                   />
                 </span>
                 <span className="den">30</span>
@@ -1731,7 +1757,7 @@ export default function App() {
                 value={answers.act33_mult}
                 onChange={(e) => updateAnswer('act33_mult', e.target.value)}
                 className={getFieldClass('act33_mult')}
-                style={{ width: '48px', height: '28px' }}
+                style={{ width: '46px', height: '26px' }}
               />
               <span>=</span>
               <input
@@ -1740,7 +1766,7 @@ export default function App() {
                 value={answers.act33_res}
                 onChange={(e) => updateAnswer('act33_res', e.target.value)}
                 className={getFieldClass('act33_res')}
-                style={{ width: '56px', height: '28px' }}
+                style={{ width: '54px', height: '26px' }}
               />
               <span>kali</span>
             </div>
@@ -1757,18 +1783,19 @@ export default function App() {
               backgroundColor: '#EFF6FF',
               border: '2px solid #2563EB',
               borderRadius: '12px',
-              padding: '14px 15px',
+              padding: '12px 15px',
+              overflow: 'hidden',
             }}
           >
             <h4
-              className="m-0 mb-2"
-              style={{ fontSize: '15.3px', fontWeight: 700, color: '#1E3A8A' }}
+              className="m-0 mb-1.5"
+              style={{ fontSize: '15px', fontWeight: 700, color: '#1E3A8A' }}
             >
               Bagian 3.4: Perbandingan dan Refleksi Konseptual
             </h4>
 
-            <div className="space-y-2.5" style={{ fontSize: '13.5px', lineHeight: 1.55, color: '#0F172A' }}>
-              <div className="bg-white px-3 py-1.5 rounded-lg border border-[#93C5FD] font-semibold">
+            <div className="space-y-2" style={{ fontSize: '13px', lineHeight: 1.48, color: '#0F172A' }}>
+              <div className="bg-white px-3 py-1 rounded-lg border border-[#93C5FD] font-semibold">
                 • Bandingkan pecahan Frekuensi Relatifmu (
                 <span className="font-extrabold text-[#EC4899]">{displayedK}/30</span>
                 ) dengan Peluang Teoretis 1/6 (5/30)!
@@ -1781,7 +1808,7 @@ export default function App() {
                   value={answers.act34_drop1}
                   onChange={(e) => updateAnswer('act34_drop1', e.target.value)}
                   className={getFieldClass('act34_drop1')}
-                  style={{ width: '165px', height: '28px', padding: '0 4px' }}
+                  style={{ width: '160px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
                 >
                   <option value="">-- Pilih Konsep --</option>
                   <option value="ruang sampel (S)">ruang sampel (S)</option>
@@ -1794,7 +1821,7 @@ export default function App() {
                   value={answers.act34_drop2}
                   onChange={(e) => updateAnswer('act34_drop2', e.target.value)}
                   className={getFieldClass('act34_drop2')}
-                  style={{ width: '90px', height: '28px', padding: '0 4px' }}
+                  style={{ width: '85px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
                 >
                   <option value="">-- Pilih --</option>
                   <option value="n(S)">n(S)</option>
@@ -1811,7 +1838,7 @@ export default function App() {
                   value={answers.act34_drop3}
                   onChange={(e) => updateAnswer('act34_drop3', e.target.value)}
                   className={getFieldClass('act34_drop3')}
-                  style={{ width: '195px', height: '28px', padding: '0 4px' }}
+                  style={{ width: '190px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
                 >
                   <option value="">-- Pilih Konsep --</option>
                   <option value="Frekuensi Relatif (f_r)">Frekuensi Relatif (f_r)</option>
@@ -1828,7 +1855,7 @@ export default function App() {
                   value={answers.act34_drop4}
                   onChange={(e) => updateAnswer('act34_drop4', e.target.value)}
                   className={getFieldClass('act34_drop4')}
-                  style={{ width: '185px', height: '28px', padding: '0 4px' }}
+                  style={{ width: '180px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
                 >
                   <option value="">-- Pilih Konsep --</option>
                   <option value="Peluang Teoretis P(B)">Peluang Teoretis P(B)</option>
@@ -1841,7 +1868,7 @@ export default function App() {
                   value={answers.act34_drop5}
                   onChange={(e) => updateAnswer('act34_drop5', e.target.value)}
                   className={getFieldClass('act34_drop5')}
-                  style={{ width: '195px', height: '28px', padding: '0 4px' }}
+                  style={{ width: '190px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
                 >
                   <option value="">-- Pilih Konsep --</option>
                   <option value="Frekuensi Harapan (F_h)">Frekuensi Harapan (F_h)</option>
@@ -1915,16 +1942,17 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <p
-              className="m-0 mb-2.5"
-              style={{ fontSize: '13.5px', lineHeight: 1.45, fontWeight: 600 }}
+              className="m-0 mb-2"
+              style={{ fontSize: '13.3px', lineHeight: 1.42, fontWeight: 600 }}
             >
               1. <strong>[TP.K1]</strong> Disajikan data 3 kemeja (Merah, Biru, Kuning) dan 2 celana (Putih, Hitam) pada Stylist Studio. Jika dilakukan 60 kali percobaan acak, maka peluang teoretis <span className="math-var">P(A)</span> dan Frekuensi Harapan <span className="math-var">F_h</span> munculnya pasangan Kemeja Merah dan Celana Putih adalah ....
             </p>
-            <div className="grid grid-cols-2 gap-2 text-[13.5px]">
+            <div className="grid grid-cols-2 gap-2 text-[13px]">
               {[
                 { opt: 'A', text: 'P(A) = 1/5 dan F_h = 12 kali' },
                 { opt: 'B', text: 'P(A) = 1/6 dan F_h = 10 kali' },
@@ -1974,12 +2002,13 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <p
               className="m-0 mb-2"
-              style={{ fontSize: '13.5px', lineHeight: 1.45, fontWeight: 600 }}
+              style={{ fontSize: '13.3px', lineHeight: 1.42, fontWeight: 600 }}
             >
               2. <strong>[TP.K1]</strong> Pada simulasi acak 3 kemeja (Merah, Biru, Kuning) dan 2 celana (Putih, Hitam), tentukan Frekuensi Harapan (<span className="math-var">F_h</span>) terambilnya pasangan pakaian yang menggunakan Kemeja Merah jika dilakukan 90 kali percobaan!
             </p>
@@ -2036,16 +2065,17 @@ export default function App() {
               backgroundColor: '#FFFFFF',
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <p
-              className="m-0 mb-2.5"
-              style={{ fontSize: '13.5px', lineHeight: 1.45, fontWeight: 600 }}
+              className="m-0 mb-2"
+              style={{ fontSize: '13.3px', lineHeight: 1.42, fontWeight: 600 }}
             >
               3. <strong>[TP.K2]</strong> Dari hasil eksperimen menekan tombol randomize sebanyak 30 kali, tercatat pasangan Kemeja Merah dan Celana Putih muncul sebanyak 6 kali. Nilai Frekuensi Relatif (<span className="math-var">f_r</span>) beserta bentuk sederhananya adalah ....
             </p>
-            <div className="grid grid-cols-4 gap-2 text-[13.5px]">
+            <div className="grid grid-cols-4 gap-2 text-[13px]">
               {[
                 { opt: 'A', text: '1/6' },
                 { opt: 'B', text: '6/36' },
@@ -2096,19 +2126,20 @@ export default function App() {
               border: '2px solid #CBD5E1',
               borderRadius: '12px',
               padding: '10px 16px',
+              overflow: 'hidden',
             }}
           >
             <p
               className="m-0 mb-1.5"
-              style={{ fontSize: '13.2px', lineHeight: 1.4, fontWeight: 600 }}
+              style={{ fontSize: '13px', lineHeight: 1.38, fontWeight: 600 }}
             >
               4. <strong>[TP.K2]</strong> Berdasarkan data <span className="math-var">f_r</span> = 6/30 = 1/5 pada Soal 3, prediksilah kemunculan kejadian tersebut untuk <span className="math-var">N</span> = 150 kali percobaan, lalu jelaskan analisis keterdekatannya dengan peluang teoretis!
             </p>
 
-            {/* Baris Hitung */}
+            {/* Baris Hitung Single-Line */}
             <div
-              className="flex flex-wrap items-center gap-1.5 mb-2 bg-[#F1F5F9] px-3 py-1 rounded-lg border border-slate-300"
-              style={{ fontSize: '13.2px', fontWeight: 700 }}
+              className="flex items-center justify-center gap-1 mb-2 bg-[#F1F5F9] px-2 py-1.5 rounded-lg border border-slate-300 whitespace-nowrap"
+              style={{ fontSize: '11.3px', fontWeight: 700 }}
             >
               <span>
                 Estimasi <span className="math-var">F_h</span>(empiris) = 150 × (
@@ -2119,7 +2150,7 @@ export default function App() {
                 value={answers.eval4_num}
                 onChange={(e) => updateAnswer('eval4_num', e.target.value)}
                 className={getFieldClass('eval4_num')}
-                style={{ width: '40px', height: '24px' }}
+                style={{ width: '32px', height: '21px', fontSize: '12px' }}
               />
               <span>/</span>
               <input
@@ -2128,7 +2159,7 @@ export default function App() {
                 value={answers.eval4_den}
                 onChange={(e) => updateAnswer('eval4_den', e.target.value)}
                 className={getFieldClass('eval4_den')}
-                style={{ width: '42px', height: '24px' }}
+                style={{ width: '34px', height: '21px', fontSize: '12px' }}
               />
               <span>) =</span>
               <input
@@ -2137,7 +2168,7 @@ export default function App() {
                 value={answers.eval4_resEmp}
                 onChange={(e) => updateAnswer('eval4_resEmp', e.target.value)}
                 className={getFieldClass('eval4_resEmp')}
-                style={{ width: '46px', height: '24px' }}
+                style={{ width: '36px', height: '21px', fontSize: '12px' }}
               />
               <span>
                 kali (sedangkan <span className="math-var">F_h</span> teoretis = 150 × 1/6 =
@@ -2148,7 +2179,7 @@ export default function App() {
                 value={answers.eval4_resTheo}
                 onChange={(e) => updateAnswer('eval4_resTheo', e.target.value)}
                 className={getFieldClass('eval4_resTheo')}
-                style={{ width: '46px', height: '24px' }}
+                style={{ width: '36px', height: '21px', fontSize: '12px' }}
               />
               <span>kali).</span>
             </div>
@@ -2164,7 +2195,7 @@ export default function App() {
                 width: '602px',
                 height: '55px',
                 resize: 'none',
-                fontSize: '13px',
+                fontSize: '12.8px',
                 lineHeight: 1.35,
               }}
             />
