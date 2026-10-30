@@ -1,36 +1,145 @@
-export type ShirtCode = 'M' | 'B' | 'K';
-export type PantsCode = 'P' | 'H';
-export type OutfitKey = `${ShirtCode},${PantsCode}`;
+export type TopCode = 'AG' | 'AP' | 'BH';
+export type BottomCode = 'S' | 'J';
+export type OutfitKey = `${TopCode},${BottomCode}`;
+
+export interface TopOptionMeta {
+  code: TopCode;
+  name: string;
+  shortName: string;
+  subtitle: string;
+  headpieceNote: string;
+  accentColor: string;
+  bgTone: string;
+}
+
+export interface BottomOptionMeta {
+  code: BottomCode;
+  name: string;
+  shortName: string;
+  subtitle: string;
+  accentColor: string;
+  bgTone: string;
+}
+
+export const TOP_OPTIONS: TopOptionMeta[] = [
+  {
+    code: 'AG',
+    name: 'Baju Aesan Gede',
+    shortName: 'Aesan Gede',
+    subtitle: 'Maroon Keemasan & Teratai Dada',
+    headpieceNote: 'Sanggul Malang & Mahkota Karsuhun',
+    accentColor: '#881337',
+    bgTone: '#FEF3C7',
+  },
+  {
+    code: 'AP',
+    name: 'Baju Aesan Paksangko',
+    shortName: 'Aesan Paksangko',
+    subtitle: 'Kurung Merah Bata Bertabur Bintang Emas',
+    headpieceNote: 'Mahkota Paksangko & Kembang Goyang',
+    accentColor: '#9A3412',
+    bgTone: '#FFFBEB',
+  },
+  {
+    code: 'BH',
+    name: 'Baju Kurung Beludru Hitam',
+    shortName: 'Beludru Hitam',
+    subtitle: 'Beludru Hitam Sulam Benang Emas',
+    headpieceNote: 'Sanggul Palembang & Tusuk Emas Sederhana',
+    accentColor: '#292524',
+    bgTone: '#FEF3C7',
+  },
+];
+
+export const BOTTOM_OPTIONS: BottomOptionMeta[] = [
+  {
+    code: 'S',
+    name: 'Kain Songket Palembang',
+    shortName: 'Songket Palembang',
+    subtitle: 'Tenun Maroon Benang Emas Motif Tumpal',
+    accentColor: '#7F1D1D',
+    bgTone: '#FEF3C7',
+  },
+  {
+    code: 'J',
+    name: 'Kain Tenun Jumputan Palembang',
+    shortName: 'Jumputan Palembang',
+    subtitle: 'Motif Ikat Celup Titik Tujuh & Belah Ketupat',
+    accentColor: '#B45309',
+    bgTone: '#FFFBEB',
+  },
+];
 
 export interface SimulationStats {
-  'M,P': number;
-  'M,H': number;
-  'B,P': number;
-  'B,H': number;
-  'K,P': number;
-  'K,H': number;
+  'AG,S': number;
+  'AG,J': number;
+  'AP,S': number;
+  'AP,J': number;
+  'BH,S': number;
+  'BH,J': number;
 }
 
 export const INITIAL_STATS: SimulationStats = {
-  'M,P': 0,
-  'M,H': 0,
-  'B,P': 0,
-  'B,H': 0,
-  'K,P': 0,
-  'K,H': 0,
+  'AG,S': 0,
+  'AG,J': 0,
+  'AP,S': 0,
+  'AP,J': 0,
+  'BH,S': 0,
+  'BH,J': 0,
 };
 
-export const ALL_OUTFITS: Array<{ shirt: ShirtCode; pants: PantsCode; key: OutfitKey; label: string }> = [
-  { shirt: 'M', pants: 'P', key: 'M,P', label: '(M, P)' },
-  { shirt: 'M', pants: 'H', key: 'M,H', label: '(M, H)' },
-  { shirt: 'B', pants: 'P', key: 'B,P', label: '(B, P)' },
-  { shirt: 'B', pants: 'H', key: 'B,H', label: '(B, H)' },
-  { shirt: 'K', pants: 'P', key: 'K,P', label: '(K, P)' },
-  { shirt: 'K', pants: 'H', key: 'K,H', label: '(K, H)' },
+export const ALL_OUTFITS: Array<{
+  top: TopCode;
+  bottom: BottomCode;
+  key: OutfitKey;
+  label: string;
+  fullTitle: string;
+}> = [
+  { top: 'AG', bottom: 'S', key: 'AG,S', label: '(AG, S)', fullTitle: 'Aesan Gede + Songket' },
+  { top: 'AG', bottom: 'J', key: 'AG,J', label: '(AG, J)', fullTitle: 'Aesan Gede + Jumputan' },
+  { top: 'AP', bottom: 'S', key: 'AP,S', label: '(AP, S)', fullTitle: 'Aesan Paksangko + Songket' },
+  { top: 'AP', bottom: 'J', key: 'AP,J', label: '(AP, J)', fullTitle: 'Aesan Paksangko + Jumputan' },
+  { top: 'BH', bottom: 'S', key: 'BH,S', label: '(BH, S)', fullTitle: 'Beludru Hitam + Songket' },
+  { top: 'BH', bottom: 'J', key: 'BH,J', label: '(BH, J)', fullTitle: 'Beludru Hitam + Jumputan' },
 ];
 
+export const MAX_SPIN_TRIALS = 20;
+
+export interface SaveOutfitResult {
+  savedOutfits: OutfitKey[];
+  isDuplicate: boolean;
+  message: string;
+}
+
+export function saveOutfitCombination(
+  currentSaved: OutfitKey[],
+  top: TopCode | null,
+  bottom: BottomCode | null
+): SaveOutfitResult {
+  if (!top || !bottom) {
+    return {
+      savedOutfits: currentSaved,
+      isDuplicate: false,
+      message: 'Pilih 1 atasan dan 1 bawahan terlebih dahulu sebelum menyimpan!',
+    };
+  }
+  const key: OutfitKey = `${top},${bottom}`;
+  if (currentSaved.includes(key)) {
+    return {
+      savedOutfits: currentSaved,
+      isDuplicate: true,
+      message: 'Pasangan pakaian ini sudah kamu pilih!',
+    };
+  }
+  return {
+    savedOutfits: [...currentSaved, key],
+    isDuplicate: false,
+    message: `Pasangan (${top}, ${bottom}) berhasil disimpan ke tabel Aktivitas 1!`,
+  };
+}
+
 export interface StudentAnswers {
-  // Page 1 Identity (tracked for progress, not graded wrong)
+  // Halaman 1: Identitas Kelompok & Kelas
   groupName: string;
   classSemester: string;
   member1: string;
@@ -39,65 +148,44 @@ export interface StudentAnswers {
   member4: string;
   member5: string;
 
-  // Page 2 Apersepsi (TP.P1 & TP.P2)
+  // Halaman 2: Apersepsi (Pecahan & Perkalian Pecahan)
   ap1_num1: string; // 1
   ap1_den1: string; // 3
   ap1_num2: string; // 1
-  ap1_den2: string; // 5
-  ap2_res1: string; // 5
-  ap2_res2: string; // 10
+  ap1_den2: string; // 2
+  ap2_res1: string; // 5 (1/4 x 20)
+  ap2_res2: string; // 4 (1/5 x 20)
 
-  // Page 3 Aktivitas 1 (TP.D1)
-  act1_MH: string; // (M, H)
-  act1_BP: string; // (B, P)
-  act1_KP: string; // (K, P)
-  act1_KH: string; // (K, H)
+  // Halaman 3: Aktivitas 1 (Menemukan Ruang Sampel)
   act1_nS: string; // 6
-  act1_nB: string; // 1
+  act1_nA: string; // 1
 
-  // Page 3 Aktivitas 2 (TP.D2)
+  // Halaman 3: Aktivitas 2 (Menentukan Peluang Teoretis)
   act2_num: string; // 1
   act2_den: string; // 6
-  act2_drop1: string; // n(B)
-  act2_drop2: string; // n(S)
+  act2_reason: string; // Pemahaman mengapa setiap kombinasi memiliki peluang sama (1/6)
 
-  // Page 4 Aktivitas 3.1
+  // Halaman 4: Bagian 3.1 (Menghitung Frekuensi Harapan N = 20)
+  act31_N: string; // 20
   act31_num: string; // 1
   act31_den: string; // 6
-  act31_res: string; // 5
+  act31_res: string; // 20/6 atau 10/3 atau 3,33
 
-  // Page 4 Aktivitas 3.2
-  act32_k: string; // dynamic k (0..30, default e.g. from simulator)
-  act32_num: string; // equals k
+  // Halaman 4: Bagian 3.3 (Menghitung Frekuensi Relatif N = 20)
+  act33_k: string; // Frekuensi hasil percobaan untuk (AG, S)
+  act33_N: string; // 20
+  act33_num: string; // sama dengan k
+  act33_den: string; // 20
 
-  // Page 4 Aktivitas 3.3
-  act33_num: string; // equals k
-  act33_mult: string; // equals k
-  act33_res: string; // equals 4 * k
-
-  // Page 4 Aktivitas 3.4
-  act34_drop1: string; // ruang sampel (S)
-  act34_drop2: string; // n(S)
-  act34_drop3: string; // Frekuensi Relatif (f_r)
-  act34_drop4: string; // Peluang Teoretis P(B)
-  act34_drop5: string; // Frekuensi Harapan (F_h)
-
-  // Page 5 Evaluasi
-  eval1_choice: string; // B
-  eval2_num: string; // 2
-  eval2_den: string; // 6
-  eval2_res: string; // 30
-  eval3_choice: string; // C
-  eval4_num: string; // 6
-  eval4_den: string; // 30
-  eval4_resEmp: string; // 30
-  eval4_resTheo: string; // 25
-  eval4_analysis: string; // non-empty text
+  // Halaman 4: Bagian 3.4 (Membandingkan Hasil Percobaan)
+  act34_q1: string; // Apakah setiap pasangan selalu muncul dengan jumlah yang sama?
+  act34_q2: string; // Mengapa hasil percobaan dapat berbeda dari frekuensi harapan?
+  act34_q3: string; // Hubungan peluang teoretis, frekuensi harapan, dan frekuensi relatif
 }
 
 export const INITIAL_ANSWERS: StudentAnswers = {
   groupName: '',
-  classSemester: 'VIII (Delapan) - A / Genap',
+  classSemester: 'VIII (Delapan) / Genap',
   member1: '',
   member2: '',
   member3: '',
@@ -111,62 +199,27 @@ export const INITIAL_ANSWERS: StudentAnswers = {
   ap2_res1: '',
   ap2_res2: '',
 
-  act1_MH: '',
-  act1_BP: '',
-  act1_KP: '',
-  act1_KH: '',
   act1_nS: '',
-  act1_nB: '',
+  act1_nA: '',
 
   act2_num: '',
   act2_den: '',
-  act2_drop1: '',
-  act2_drop2: '',
+  act2_reason: '',
 
+  act31_N: '20',
   act31_num: '',
   act31_den: '',
   act31_res: '',
 
-  act32_k: '',
-  act32_num: '',
-
+  act33_k: '',
+  act33_N: '20',
   act33_num: '',
-  act33_mult: '',
-  act33_res: '',
+  act33_den: '20',
 
-  act34_drop1: '',
-  act34_drop2: '',
-  act34_drop3: '',
-  act34_drop4: '',
-  act34_drop5: '',
-
-  eval1_choice: '',
-  eval2_num: '',
-  eval2_den: '',
-  eval2_res: '',
-  eval3_choice: '',
-  eval4_num: '',
-  eval4_den: '',
-  eval4_resEmp: '',
-  eval4_resTheo: '',
-  eval4_analysis: '',
+  act34_q1: '',
+  act34_q2: '',
+  act34_q3: '',
 };
-
-/**
- * Normalizes a sample point string like " ( m , h ) " or "M,H" into "(M, H)"
- */
-export function normalizePairInput(raw: string): string {
-  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, '');
-  const match = cleaned.match(/^\(?([MBK]),([PH])\)?$/);
-  if (match) {
-    return `(${match[1]}, ${match[2]})`;
-  }
-  return raw.trim();
-}
-
-export function normalizeNumericInput(raw: string): string {
-  return raw.trim();
-}
 
 export type ValidationMap = Partial<Record<keyof StudentAnswers, boolean>>;
 
@@ -174,98 +227,98 @@ export interface EvaluationResult {
   validation: ValidationMap;
   correctCount: number;
   totalGradable: number;
-  score: number; // 0 to 100
+  score: number;
+  savedCountBonus: number;
 }
 
-/**
- * Evaluates all gradable fields in StudentAnswers.
- * Dynamic empirical fields on Page 4 (3.2 & 3.3) are validated consistently
- * against the student's recorded k value (where 0 <= k <= 30).
- */
-export function evaluateStudentAnswers(answers: StudentAnswers): EvaluationResult {
-  const v: ValidationMap = {};
+function norm(val: string): string {
+  return val.trim().replace(/\s+/g, '').toLowerCase();
+}
 
-  // Page 2 Apersepsi (6 items)
-  v.ap1_num1 = normalizeNumericInput(answers.ap1_num1) === '1';
-  v.ap1_den1 = normalizeNumericInput(answers.ap1_den1) === '3';
-  v.ap1_num2 = normalizeNumericInput(answers.ap1_num2) === '1';
-  v.ap1_den2 = normalizeNumericInput(answers.ap1_den2) === '5';
-  v.ap2_res1 = normalizeNumericInput(answers.ap2_res1) === '5';
-  v.ap2_res2 = normalizeNumericInput(answers.ap2_res2) === '10';
+function isExpectedFreqValid(val: string): boolean {
+  const cleaned = norm(val).replace(',', '.');
+  if (!cleaned) return false;
+  if (
+    cleaned === '20/6' ||
+    cleaned === '10/3' ||
+    cleaned === '3.3' ||
+    cleaned === '3.33' ||
+    cleaned === '3.333' ||
+    cleaned === '31/3' ||
+    cleaned === '3' ||
+    cleaned === '3atau4'
+  ) {
+    return true;
+  }
+  const num = Number(cleaned);
+  return Number.isFinite(num) && Math.abs(num - 20 / 6) <= 0.35;
+}
 
-  // Page 3 Aktivitas 1 (6 items)
-  v.act1_MH = normalizePairInput(answers.act1_MH) === '(M, H)';
-  v.act1_BP = normalizePairInput(answers.act1_BP) === '(B, P)';
-  v.act1_KP = normalizePairInput(answers.act1_KP) === '(K, P)';
-  v.act1_KH = normalizePairInput(answers.act1_KH) === '(K, H)';
-  v.act1_nS = normalizeNumericInput(answers.act1_nS) === '6';
-  v.act1_nB = normalizeNumericInput(answers.act1_nB) === '1';
+export function evaluateStudentAnswers(
+  answers: StudentAnswers,
+  savedOutfitsCount: number = 0
+): EvaluationResult {
+  const validation: ValidationMap = {};
 
-  // Page 3 Aktivitas 2 (4 items)
-  v.act2_num = normalizeNumericInput(answers.act2_num) === '1';
-  v.act2_den = normalizeNumericInput(answers.act2_den) === '6';
-  v.act2_drop1 = answers.act2_drop1 === 'n(B)';
-  v.act2_drop2 = answers.act2_drop2 === 'n(S)';
+  // Halaman 2: Apersepsi
+  validation.ap1_num1 = norm(answers.ap1_num1) === '1';
+  validation.ap1_den1 = norm(answers.ap1_den1) === '3';
+  validation.ap1_num2 = norm(answers.ap1_num2) === '1';
+  validation.ap1_den2 = norm(answers.ap1_den2) === '2';
+  validation.ap2_res1 = norm(answers.ap2_res1) === '5';
+  validation.ap2_res2 = norm(answers.ap2_res2) === '4';
 
-  // Page 4 Aktivitas 3.1 (3 items)
-  v.act31_num = normalizeNumericInput(answers.act31_num) === '1';
-  v.act31_den = normalizeNumericInput(answers.act31_den) === '6';
-  v.act31_res = normalizeNumericInput(answers.act31_res) === '5';
+  // Halaman 3: Aktivitas 1 & 2
+  validation.act1_nS = norm(answers.act1_nS) === '6';
+  validation.act1_nA = norm(answers.act1_nA) === '1';
 
-  // Page 4 Aktivitas 3.2 & 3.3 (5 items based on k)
-  const kStr = normalizeNumericInput(answers.act32_k);
-  const kNum = Number(kStr);
-  const isValidK = kStr !== '' && Number.isInteger(kNum) && kNum >= 0 && kNum <= 30;
-  v.act32_k = isValidK;
-  v.act32_num = isValidK && normalizeNumericInput(answers.act32_num) === String(kNum);
-  v.act33_num = isValidK && normalizeNumericInput(answers.act33_num) === String(kNum);
-  v.act33_mult = isValidK && normalizeNumericInput(answers.act33_mult) === String(kNum);
-  v.act33_res = isValidK && normalizeNumericInput(answers.act33_res) === String(4 * kNum);
+  validation.act2_num = norm(answers.act2_num) === '1';
+  validation.act2_den = norm(answers.act2_den) === '6';
+  validation.act2_reason = answers.act2_reason.trim().length >= 5;
 
-  // Page 4 Aktivitas 3.4 (5 items)
-  v.act34_drop1 = answers.act34_drop1 === 'ruang sampel (S)';
-  v.act34_drop2 = answers.act34_drop2 === 'n(S)';
-  v.act34_drop3 = answers.act34_drop3 === 'Frekuensi Relatif (f_r)';
-  v.act34_drop4 = answers.act34_drop4 === 'Peluang Teoretis P(B)';
-  v.act34_drop5 = answers.act34_drop5 === 'Frekuensi Harapan (F_h)';
+  // Halaman 4: Bagian 3.1 (Frekuensi Harapan N = 20)
+  validation.act31_N = norm(answers.act31_N) === '20';
+  validation.act31_num = norm(answers.act31_num) === '1';
+  validation.act31_den = norm(answers.act31_den) === '6';
+  validation.act31_res = isExpectedFreqValid(answers.act31_res);
 
-  // Page 5 Evaluasi (10 items)
-  v.eval1_choice = answers.eval1_choice === 'B';
-  const e2n = normalizeNumericInput(answers.eval2_num);
-  const e2d = normalizeNumericInput(answers.eval2_den);
-  const e2PairOk = (e2n === '2' && e2d === '6') || (e2n === '1' && e2d === '3');
-  v.eval2_num = e2PairOk ? true : e2n === '2';
-  v.eval2_den = e2PairOk ? true : e2d === '6';
-  v.eval2_res = normalizeNumericInput(answers.eval2_res) === '30';
+  // Halaman 4: Bagian 3.3 (Frekuensi Relatif N = 20)
+  const kTrim = norm(answers.act33_k);
+  const kNum = kTrim !== '' ? Number(kTrim) : NaN;
+  const kValid = Number.isInteger(kNum) && kNum >= 0 && kNum <= MAX_SPIN_TRIALS;
 
-  v.eval3_choice = answers.eval3_choice === 'C';
+  validation.act33_k = kValid;
+  validation.act33_N = norm(answers.act33_N) === '20';
+  validation.act33_num = kValid && norm(answers.act33_num) === String(kNum);
+  validation.act33_den = norm(answers.act33_den) === '20';
 
-  const e4n = normalizeNumericInput(answers.eval4_num);
-  const e4d = normalizeNumericInput(answers.eval4_den);
-  const e4PairOk = (e4n === '6' && e4d === '30') || (e4n === '1' && e4d === '5');
-  v.eval4_num = e4PairOk ? true : e4n === '6';
-  v.eval4_den = e4PairOk ? true : e4d === '30';
-  v.eval4_resEmp = normalizeNumericInput(answers.eval4_resEmp) === '30';
-  v.eval4_resTheo = normalizeNumericInput(answers.eval4_resTheo) === '25';
-  v.eval4_analysis = answers.eval4_analysis.trim().length >= 8;
+  // Halaman 4: Bagian 3.4 (Refleksi Perbandingan)
+  validation.act34_q1 = answers.act34_q1.trim().length >= 3;
+  validation.act34_q2 = answers.act34_q2.trim().length >= 5;
+  validation.act34_q3 = answers.act34_q3.trim().length >= 5;
 
-  const keys = Object.keys(v) as Array<keyof ValidationMap>;
-  const totalGradable = keys.length;
-  const correctCount = keys.filter((k) => v[k] === true).length;
+  const keys = Object.keys(validation) as Array<keyof StudentAnswers>;
+  const fieldCorrect = keys.filter((k) => validation[k] === true).length;
+
+  // Include 6 points for completing the 6 cells in Tabel Aktivitas 1
+  const clampedSaved = Math.max(0, Math.min(6, savedOutfitsCount));
+  const totalGradable = keys.length + 6;
+  const correctCount = fieldCorrect + clampedSaved;
   const score = Math.round((correctCount / totalGradable) * 100);
 
   return {
-    validation: v,
+    validation,
     correctCount,
     totalGradable,
     score,
+    savedCountBonus: clampedSaved,
   };
 }
 
-/**
- * Calculates completion percentage (0..100) across gradable fields + group name.
- */
-export function calculateProgressPercentage(answers: StudentAnswers): number {
+export function calculateProgressPercentage(
+  answers: StudentAnswers,
+  savedOutfitsCount: number = 0
+): number {
   const trackedKeys: Array<keyof StudentAnswers> = [
     'groupName',
     'member1',
@@ -275,61 +328,50 @@ export function calculateProgressPercentage(answers: StudentAnswers): number {
     'ap1_den2',
     'ap2_res1',
     'ap2_res2',
-    'act1_MH',
-    'act1_BP',
-    'act1_KP',
-    'act1_KH',
     'act1_nS',
-    'act1_nB',
+    'act1_nA',
     'act2_num',
     'act2_den',
-    'act2_drop1',
-    'act2_drop2',
+    'act2_reason',
+    'act31_N',
     'act31_num',
     'act31_den',
     'act31_res',
-    'act32_k',
-    'act32_num',
+    'act33_k',
     'act33_num',
-    'act33_mult',
-    'act33_res',
-    'act34_drop1',
-    'act34_drop2',
-    'act34_drop3',
-    'act34_drop4',
-    'act34_drop5',
-    'eval1_choice',
-    'eval2_num',
-    'eval2_den',
-    'eval2_res',
-    'eval3_choice',
-    'eval4_num',
-    'eval4_den',
-    'eval4_resEmp',
-    'eval4_resTheo',
-    'eval4_analysis',
+    'act34_q1',
+    'act34_q2',
+    'act34_q3',
   ];
 
-  const filled = trackedKeys.filter((k) => answers[k].trim() !== '').length;
-  return Math.round((filled / trackedKeys.length) * 100);
+  const filledFields = trackedKeys.filter((k) => answers[k].trim().length > 0).length;
+  const clampedSaved = Math.max(0, Math.min(6, savedOutfitsCount));
+  return Math.round(((filledFields + clampedSaved) / (trackedKeys.length + 6)) * 100);
 }
 
-/**
- * Runs N random outfit trials and returns the resulting frequency distribution
- * and the last chosen outfit.
- */
 export function runRandomTrials(
-  count: number,
+  trials: number = MAX_SPIN_TRIALS,
   rng: () => number = Math.random
-): { stats: SimulationStats; lastOutfit: { shirt: ShirtCode; pants: PantsCode; key: OutfitKey } } {
+): {
+  stats: SimulationStats;
+  lastOutfit: { top: TopCode; bottom: BottomCode; key: OutfitKey };
+  sequence: Array<{ top: TopCode; bottom: BottomCode; key: OutfitKey }>;
+} {
   const stats: SimulationStats = { ...INITIAL_STATS };
+  const sequence: Array<{ top: TopCode; bottom: BottomCode; key: OutfitKey }> = [];
   let lastOutfit = ALL_OUTFITS[0];
 
-  for (let i = 0; i < count; i++) {
-    const idx = Math.floor(rng() * ALL_OUTFITS.length) % ALL_OUTFITS.length;
-    lastOutfit = ALL_OUTFITS[idx];
-    stats[lastOutfit.key] += 1;
+  for (let i = 0; i < trials; i++) {
+    const idx = Math.min(ALL_OUTFITS.length - 1, Math.floor(rng() * ALL_OUTFITS.length));
+    const chosen = ALL_OUTFITS[idx];
+    stats[chosen.key] += 1;
+    lastOutfit = chosen;
+    sequence.push({ top: chosen.top, bottom: chosen.bottom, key: chosen.key });
   }
 
-  return { stats, lastOutfit };
+  return {
+    stats,
+    lastOutfit: { top: lastOutfit.top, bottom: lastOutfit.bottom, key: lastOutfit.key },
+    sequence,
+  };
 }

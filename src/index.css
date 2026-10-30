@@ -1,317 +1,118 @@
 @import "tailwindcss";
 
-:root {
-  --font-main: 'Plus Jakarta Sans', 'Nunito', sans-serif;
-  --font-math: 'Cambria Math', 'Times New Roman', Georgia, serif;
+@layer base {
+  body {
+    background-color: #F5E6C8;
+    background-image: radial-gradient(#D97706 0.75px, #F5E6C8 0.75px);
+    background-size: 20px 20px;
+    color: #291811;
+    font-family: 'Plus Jakarta Sans', 'Nunito', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+  }
 }
 
-* {
-  box-sizing: border-box;
-  -webkit-print-color-adjust: exact !important;
-  print-color-adjust: exact !important;
+.math-serif {
+  font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #FEF3C7;
-  font-family: var(--font-main);
-  color: #0F172A;
-  overflow-x: auto;
-}
-
-/* Wrapper for the 5 A4 Pages */
-.lkpd-workspace {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-  padding-top: 68px;
-  padding-bottom: 64px;
-  min-width: 826px;
-}
-
-/* Standard ISO A4 Vertical Canvas at 96 DPI: 794px x 1123px */
-.a4-page {
-  position: relative;
-  width: 794px;
-  min-height: 1123px;
-  height: 1123px;
-  background-color: #FFFFFF;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
-  overflow: hidden;
-  flex-shrink: 0;
-  scroll-margin-top: 64px;
-}
-
-ol.numbered-list {
-  list-style-type: decimal;
-}
-
-/* Typography Specifications */
-.cover-h1 {
-  font-family: var(--font-main);
-  font-size: 35px; /* 26pt */
-  font-weight: 800;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-.cover-h2 {
-  font-family: var(--font-main);
-  font-size: 19px; /* 14pt */
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.activity-h3 {
-  font-family: var(--font-main);
-  font-size: 17.5px; /* 13pt */
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.body-lkpd {
-  font-family: var(--font-main);
-  font-size: 15px; /* 11pt */
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-/* Math Variables & Vertical Fraction Component */
 .math-var {
-  font-family: var(--font-math);
+  font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
   font-style: italic;
+}
+
+/* ISO A4 Vertical 96 DPI: 794px x 1123px */
+.a4-page {
+  width: 794px;
+  min-width: 794px;
+  max-width: 794px;
+  height: 1123px;
+  min-height: 1123px;
+  background-color: #FFFDF7;
+  box-shadow: 0 12px 28px rgba(69, 26, 3, 0.22);
+  position: relative;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 32px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 2px solid #78350F;
+}
+
+/* Chibi Pop Scale Animation */
+@keyframes chibiPop {
+  0% {
+    transform: scale(0.92);
+  }
+  65% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-chibi-pop {
+  animation: chibiPop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Interactive input styling in Palembang Heritage theme */
+.student-input {
+  background-color: #FFFBEB;
+  border: 2px solid #92400E;
+  border-radius: 6px;
+  color: #451A03;
   font-weight: 700;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.math-formula {
-  font-family: var(--font-math);
+.student-input:focus {
+  outline: none;
+  border-color: #881337;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px #FDE68A;
 }
 
-.fraction {
+.input-valid {
+  border: 2px solid #15803D !important;
+  background-color: #DCFCE7 !important;
+  color: #14532D !important;
+}
+
+.input-invalid {
+  border: 2px solid #B91C1C !important;
+  background-color: #FEE2E2 !important;
+  color: #7F1D1D !important;
+}
+
+/* Fraction stack helper */
+.fraction-box {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   vertical-align: middle;
   margin: 0 4px;
-  font-family: var(--font-math);
-  line-height: 1.1;
 }
 
-.fraction .num {
-  padding: 1px 6px;
-  border-bottom: 1.5px solid #0F172A;
-  text-align: center;
-  min-width: 24px;
-}
-
-.fraction .den {
-  padding: 1px 6px;
-  text-align: center;
-  min-width: 24px;
-}
-
-/* Student Input Box Styling */
-.student-input {
-  background-color: #FEFCE8;
-  border: 2px dashed #64748B;
-  border-radius: 8px;
-  text-align: center;
-  font-family: var(--font-main);
-  font-weight: 700;
-  color: #0F172A;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
-}
-
-.student-input:focus {
-  border-color: #2563EB;
-  border-style: solid;
-  background-color: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.student-input.left-align {
-  text-align: left;
-  padding-left: 10px;
-  padding-right: 10px;
-}
-
-.student-input.input-valid {
-  background-color: #DCFCE7 !important;
-  border: 2px solid #16A34A !important;
-  color: #15803D !important;
-}
-
-.student-input.input-invalid {
-  background-color: #FEE2E2 !important;
-  border: 2px solid #DC2626 !important;
-  color: #B91C1C !important;
-}
-
-/* Boutique Striped Canopy */
-.boutique-canopy {
-  background: repeating-linear-gradient(
-    90deg,
-    #F472B6 0px,
-    #F472B6 26px,
-    #FFFFFF 26px,
-    #FFFFFF 52px
-  );
-  border-bottom: 3px solid #1E293B;
-}
-
-/* Chibi & Hanger Keyframe Animations */
-@keyframes blink {
-  0%, 92%, 100% {
-    transform: scaleY(1);
-  }
-  96% {
-    transform: scaleY(0.08);
-  }
-}
-
-.chibi-eyes {
-  transform-origin: 80px 59px;
-  animation: blink 3s infinite ease-in-out;
-}
-
-@keyframes outfitPop {
-  0% {
-    transform: scale(0.85);
-  }
-  55% {
-    transform: scale(1.12);
-  }
-  100% {
-    transform: scale(1.0);
-  }
-}
-
-.chibi-outfit-animated {
-  transform-origin: 80px 135px;
-  animation: outfitPop 0.38s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes sparkleTwinkle {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.82);
-  }
-}
-
-.sparkle-stars {
-  transform-origin: 80px 100px;
-  animation: sparkleTwinkle 1.6s infinite ease-in-out;
-}
-
-@keyframes hangerSwing {
-  0% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(-6deg);
-  }
-  75% {
-    transform: rotate(6deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
-.hanger-btn {
-  transform-origin: top center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.hanger-btn:hover {
-  animation: hangerSwing 0.55s ease-in-out infinite;
-}
-
-/* 3D Capsule Buttons */
-.btn-gacha-1 {
-  background-color: #38BDF8;
-  border: 2.5px solid #1E293B;
-  box-shadow: 0 4px 0 #0284C7;
-  border-radius: 9999px;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-
-.btn-gacha-1:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 #0284C7;
-}
-
-.btn-gacha-30 {
-  background-color: #EC4899;
-  color: #FFFFFF;
-  font-weight: 700;
-  border: 2.5px solid #1E293B;
-  box-shadow: 0 5px 0 #9D174D;
-  border-radius: 9999px;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-
-.btn-gacha-30:active {
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 #9D174D;
-}
-
-.btn-reset {
-  background-color: #94A3B8;
-  border: 2px solid #1E293B;
-  border-radius: 8px;
-  transition: background-color 0.15s ease;
-}
-
-.btn-reset:hover {
-  background-color: #CBD5E1;
-}
-
-/* Print Rules for 5 Exact A4 Portrait Sheets */
-@page {
-  size: A4 portrait;
-  margin: 0;
+.fraction-line {
+  width: 100%;
+  min-width: 34px;
+  height: 2px;
+  background-color: #451A03;
+  margin: 2px 0;
 }
 
 @media print {
-  html, body {
-    background-color: #FFFFFF !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  body {
+    background: #FFFFFF;
   }
-
   .no-print {
     display: none !important;
   }
-
-  .lkpd-workspace {
-    padding: 0 !important;
-    margin: 0 !important;
-    gap: 0 !important;
-    min-width: 0 !important;
-    display: block !important;
-  }
-
   .a4-page {
-    width: 794px !important;
-    height: 1123px !important;
-    min-height: 1123px !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    page-break-after: always !important;
-    break-after: page !important;
-  }
-
-  .a4-page:last-child {
-    page-break-after: auto !important;
-    break-after: auto !important;
+    margin: 0 auto;
+    box-shadow: none;
+    page-break-after: always;
   }
 }

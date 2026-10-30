@@ -1,40 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { toJpeg } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 import {
-  ShirtCode,
-  PantsCode,
+  TopCode,
+  BottomCode,
+  OutfitKey,
+  TOP_OPTIONS,
+  BOTTOM_OPTIONS,
+  ALL_OUTFITS,
   SimulationStats,
   INITIAL_STATS,
-  ALL_OUTFITS,
+  MAX_SPIN_TRIALS,
+  saveOutfitCombination,
   StudentAnswers,
   INITIAL_ANSWERS,
   ValidationMap,
   evaluateStudentAnswers,
   calculateProgressPercentage,
-  runRandomTrials,
 } from './utils/lkpdLogic';
 import { soundEngine } from './utils/soundEngine';
-import { ShirtSvg, PantsSvg, ChibiCharacterSvg, SHIRT_COLORS, PANTS_COLORS } from './components/SvgAssets';
+import {
+  TumpalBorderSvg,
+  TopCardIllustrationSvg,
+  BottomCardIllustrationSvg,
+  PalembangChibiCharacterSvg,
+  PalembangSpinWheelSvg,
+} from './components/SvgAssets';
 
 export default function App() {
-  // Simulator State
-  const [selectedShirt, setSelectedShirt] = useState<ShirtCode>('M');
-  const [selectedPants, setSelectedPants] = useState<PantsCode>('P');
-  const [popKey, setPopKey] = useState<number>(1);
+  // ==================== 1. HALAMAN 1: ANIMASI OTOMATIS 6 BUSANA ADAT (1 DETIK) ====================
+  const [coverIndex, setCoverIndex] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCoverIndex((prev) => (prev + 1) % ALL_OUTFITS.length);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const currentCoverOutfit = ALL_OUTFITS[coverIndex];
+
+  // ==================== 2. HALAMAN 3: STATE BUTIK DIGITAL & TABEL AKTIVITAS 1 ====================
+  const [boutiqueTop, setBoutiqueTop] = useState<TopCode | null>(null);
+  const [boutiqueBottom, setBoutiqueBottom] = useState<BottomCode | null>(null);
+  const [boutiquePopKey, setBoutiquePopKey] = useState<number>(1);
+  const [savedOutfits, setSavedOutfits] = useState<OutfitKey[]>([]);
+  const [saveNotice, setSaveNotice] = useState<{ text: string; isError: boolean } | null>(null);
+
+  // ==================== 3. HALAMAN 4: STATE SIMULASI SPIN 20 PERCOBAAN ====================
+  const [spinTop, setSpinTop] = useState<TopCode | null>(null);
+  const [spinBottom, setSpinBottom] = useState<BottomCode | null>(null);
+  const [spinPopKey, setSpinPopKey] = useState<number>(1);
+  const [wheelAngle, setWheelAngle] = useState<number>(0);
   const [stats, setStats] = useState<SimulationStats>(INITIAL_STATS);
   const [totalTrials, setTotalTrials] = useState<number>(0);
+  const [isAutoSpinning, setIsAutoSpinning] = useState<boolean>(false);
+  const [spinNotice, setSpinNotice] = useState<string>('');
+  const autoSpinTimerRef = useRef<number | null>(null);
 
-  // Audio State
+  // ==================== 4. AUDIO & JAWABAN SISWA ====================
   const [bgmOn, setBgmOn] = useState<boolean>(false);
   const [sfxOn, setSfxOn] = useState<boolean>(true);
-
-  // Student Worksheet Answers State
   const [answers, setAnswers] = useState<StudentAnswers>(INITIAL_ANSWERS);
   const [validation, setValidation] = useState<ValidationMap>({});
   const [hasChecked, setHasChecked] = useState<boolean>(false);
   const [finalScore, setFinalScore] = useState<number>(0);
   const [feedbackBanner, setFeedbackBanner] = useState<string>('');
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
-  const progressPct = calculateProgressPercentage(answers);
+  useEffect(() => {
+    return () => {
+      if (autoSpinTimerRef.current) {
+        window.clearInterval(autoSpinTimerRef.current);
+      }
+    };
+  }, []);
+
+  const progressPct = calculateProgressPercentage(answers, savedOutfits.length);
 
   const updateAnswer = (field: keyof StudentAnswers, value: string) => {
     setAnswers((prev) => ({
@@ -50,2244 +92,1647 @@ export default function App() {
     return `student-input ${validation[field] ? 'input-valid' : 'input-invalid'} ${extra}`.trim();
   };
 
-  // Select Shirt or Pants manually
-  const handleSelectShirt = (code: ShirtCode) => {
-    setSelectedShirt(code);
-    setPopKey((k) => k + 1);
+  // Handler Pilih Atasan & Bawahan di Halaman 3
+  const handleSelectBoutiqueTop = (code: TopCode) => {
+    setBoutiqueTop(code);
+    setBoutiquePopKey((k) => k + 1);
+    setSaveNotice(null);
     soundEngine.playPopSfx();
   };
 
-  const handleSelectPants = (code: PantsCode) => {
-    setSelectedPants(code);
-    setPopKey((k) => k + 1);
+  const handleSelectBoutiqueBottom = (code: BottomCode) => {
+    setBoutiqueBottom(code);
+    setBoutiquePopKey((k) => k + 1);
+    setSaveNotice(null);
     soundEngine.playPopSfx();
   };
 
-  // Acak 1 Kali
-  const handleRandomizeOne = () => {
+  // Handler Tombol SIMPAN SET PAKAIAN di Halaman 3
+  const handleSaveBoutiqueOutfit = () => {
+    const result = saveOutfitCombination(savedOutfits, boutiqueTop, boutiqueBottom);
+    if (result.isDuplicate || result.savedOutfits.length === savedOutfits.length) {
+      soundEngine.playPopSfx();
+      setSaveNotice({ text: result.message, isError: true });
+      return;
+    }
+
+    soundEngine.playSuccessChime();
+    setSavedOutfits(result.savedOutfits);
+    setSaveNotice({ text: result.message, isError: false });
+
+    if (result.savedOutfits.length === 6 && !answers.act1_nS) {
+      setAnswers((prev) => ({
+        ...prev,
+        act1_nS: '6',
+        act1_nA: prev.act1_nA || '1',
+      }));
+    }
+  };
+
+  // Sinkronisasi nilai k untuk pasangan (AG, S) ke Bagian 3.3 ketika percobaan selesai
+  const syncFrequencyToAnswers = (nextStats: SimulationStats) => {
+    const kVal = String(nextStats['AG,S']);
+    setAnswers((prev) => ({
+      ...prev,
+      act33_k: kVal,
+      act33_num: kVal,
+      act33_N: '20',
+      act33_den: '20',
+    }));
+  };
+
+  // Handler SPIN 1 KALI di Halaman 4
+  const handleSpinOnce = () => {
+    if (isAutoSpinning) return;
+    if (totalTrials >= MAX_SPIN_TRIALS) {
+      setSpinNotice('Batas 20 percobaan telah tercapai! Klik RESET DATA untuk mengulang.');
+      soundEngine.playPopSfx();
+      return;
+    }
+
     const idx = Math.floor(Math.random() * ALL_OUTFITS.length);
     const chosen = ALL_OUTFITS[idx];
-    setSelectedShirt(chosen.shirt);
-    setSelectedPants(chosen.pants);
-    setPopKey((k) => k + 1);
+    const targetMod = (360 - idx * 60) % 360;
+
+    setWheelAngle((prev) => {
+      const currentBase = Math.floor(prev / 360) * 360;
+      return currentBase + 720 + targetMod;
+    });
+    setSpinTop(chosen.top);
+    setSpinBottom(chosen.bottom);
+    setSpinPopKey((k) => k + 1);
     soundEngine.playPopSfx();
 
     setStats((prev) => {
       const next = { ...prev, [chosen.key]: prev[chosen.key] + 1 };
       const nextTotal = Object.values(next).reduce((a, b) => a + b, 0);
       setTotalTrials(nextTotal);
-      if (nextTotal === 30) {
-        const kVal = String(next['M,P']);
-        setAnswers((ans) => ({
-          ...ans,
-          act32_k: kVal,
-          act32_num: ans.act32_num || kVal,
-        }));
+      setSpinNotice(`Percobaan ke-${nextTotal}: Terpilih ${chosen.label} – ${chosen.fullTitle}`);
+      if (nextTotal === MAX_SPIN_TRIALS) {
+        syncFrequencyToAnswers(next);
       }
       return next;
     });
   };
 
-  // Randomize 30 Kali
-  const handleRandomizeThirty = () => {
-    soundEngine.playGachaSpinSfx();
-    const { stats: newStats, lastOutfit } = runRandomTrials(30);
-    setSelectedShirt(lastOutfit.shirt);
-    setSelectedPants(lastOutfit.pants);
-    setPopKey((k) => k + 1);
-    setStats(newStats);
-    setTotalTrials(30);
+  // Handler RANDOMIZE 20 KALI (Menjalankan hingga tepat 20 kali percobaan dengan animasi bertahap cepat)
+  const handleRandomizeTwenty = () => {
+    if (isAutoSpinning) return;
 
-    const kVal = String(newStats['M,P']);
-    setAnswers((prev) => ({
-      ...prev,
-      act32_k: kVal,
-      act32_num: kVal,
-      act33_num: prev.act33_num || kVal,
-      act33_mult: prev.act33_mult || kVal,
-    }));
+    if (autoSpinTimerRef.current) {
+      window.clearInterval(autoSpinTimerRef.current);
+    }
+
+    soundEngine.playGachaSpinSfx();
+    setIsAutoSpinning(true);
+
+    // Mulai dari kondisi bersih menuju 20 percobaan penuh agar total selalu = 20
+    const runningStats: SimulationStats = { ...INITIAL_STATS };
+    let step = 0;
+
+    setStats(INITIAL_STATS);
+    setTotalTrials(0);
+
+    autoSpinTimerRef.current = window.setInterval(() => {
+      step += 1;
+      const idx = Math.floor(Math.random() * ALL_OUTFITS.length);
+      const chosen = ALL_OUTFITS[idx];
+      runningStats[chosen.key] += 1;
+
+      const targetMod = (360 - idx * 60) % 360;
+      setWheelAngle((prev) => {
+        const currentBase = Math.floor(prev / 360) * 360;
+        return currentBase + 360 + targetMod;
+      });
+      setSpinTop(chosen.top);
+      setSpinBottom(chosen.bottom);
+      setSpinPopKey((k) => k + 1);
+      setStats({ ...runningStats });
+      setTotalTrials(step);
+      setSpinNotice(`Percobaan ke-${step}/20: ${chosen.label} (${chosen.fullTitle})`);
+
+      if (step >= MAX_SPIN_TRIALS) {
+        if (autoSpinTimerRef.current) {
+          window.clearInterval(autoSpinTimerRef.current);
+          autoSpinTimerRef.current = null;
+        }
+        setIsAutoSpinning(false);
+        syncFrequencyToAnswers(runningStats);
+        soundEngine.playSuccessChime();
+        setSpinNotice('20 Percobaan selesai! Data Frekuensi (AG, S) telah tercatat pada tabel & Bagian 3.3.');
+      }
+    }, 85);
   };
 
-  // Reset Data Simulator
-  const handleResetSimulator = () => {
+  // Handler RESET DATA di Halaman 4
+  const handleResetSpin = () => {
+    if (autoSpinTimerRef.current) {
+      window.clearInterval(autoSpinTimerRef.current);
+      autoSpinTimerRef.current = null;
+    }
+    setIsAutoSpinning(false);
     soundEngine.playPopSfx();
     setStats(INITIAL_STATS);
     setTotalTrials(0);
-    setSelectedShirt('M');
-    setSelectedPants('P');
-    setPopKey((k) => k + 1);
+    setWheelAngle(0);
+    setSpinTop(null);
+    setSpinBottom(null);
+    setSpinPopKey((k) => k + 1);
+    setSpinNotice('Data percobaan telah di-reset. Karakter kembali ke pakaian dasar.');
   };
 
-  // Handle Manual Edit of k in Activity 3.2
-  const handleChangeK = (val: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      act32_k: val,
-    }));
-  };
-
-  // Check All Answers & Play Score Sound
-  const handleCheckAllAnswers = () => {
-    const res = evaluateStudentAnswers(answers);
-    setValidation(res.validation);
-    setFinalScore(res.score);
+  // Handler PERIKSA SEMUA JAWABAN
+  const handleCheckAnswers = () => {
+    const result = evaluateStudentAnswers(answers, savedOutfits.length);
+    setValidation(result.validation);
+    setFinalScore(result.score);
     setHasChecked(true);
-    soundEngine.playCheckAnswerSfx(res.score >= 75);
+    soundEngine.playSuccessChime();
 
-    if (res.score === 100) {
-      setFeedbackBanner('Luar biasa! Seluruh jawaban tepat (Skor 100/100).');
-    } else if (res.score >= 75) {
+    if (result.score >= 85) {
       setFeedbackBanner(
-        `Bagus sekali! Skor ${res.score}/100 (${res.correctCount}/${res.totalGradable} benar).`
+        `Luar Biasa! Skor Akhir Kelompokmu: ${result.score}/100 (${result.correctCount}/${result.totalGradable} poin benar). Kalian sangat memahami Peluang Busana Adat Palembang!`
+      );
+    } else if (result.score >= 65) {
+      setFeedbackBanner(
+        `Bagus! Skor Akhir Kelompokmu: ${result.score}/100 (${result.correctCount}/${result.totalGradable} poin benar). Periksa kembali kotak berwarna merah muda untuk menyempurnakan jawaban.`
       );
     } else {
       setFeedbackBanner(
-        `Skor: ${res.score}/100 (${res.correctCount}/${res.totalGradable} benar). Perbaiki kotak merah.`
+        `Skor Akhir Kelompokmu: ${result.score}/100 (${result.correctCount}/${result.totalGradable} poin benar). Pastikan seluruh 6 sel Tabel Aktivitas 1 telah disimpan dan kotak merah diperbaiki!`
       );
     }
   };
 
-  // Toggle Audio Controls
-  const handleToggleBgm = () => {
-    const next = soundEngine.toggleBgm();
-    setBgmOn(next);
+  const toggleBgm = () => {
+    const nowPlaying = soundEngine.toggleBgm();
+    setBgmOn(nowPlaying);
   };
 
-  const handleToggleSfx = () => {
-    const next = soundEngine.toggleSfx();
+  const toggleSfx = () => {
+    const next = !sfxOn;
     setSfxOn(next);
+    soundEngine.setSfxEnabled(next);
+    if (next) soundEngine.playPopSfx();
   };
 
-  // Print A4
-  const handlePrintA4 = () => {
-    window.print();
+  const scrollToPage = (pageNum: number) => {
+    soundEngine.playPopSfx();
+    const el = document.getElementById(`halaman-${pageNum}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
-  const displayedK = answers.act32_k.trim() !== '' ? answers.act32_k.trim() : String(stats['M,P'] || 'k');
+  // Handler Download PDF 4 Halaman A4 (Tangkapan Layar Utuh)
+  const handleDownloadPdf = async () => {
+    if (isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
+    soundEngine.playPopSfx();
+
+    try {
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      const pageIds = ['halaman-1', 'halaman-2', 'halaman-3', 'halaman-4'];
+
+      for (let i = 0; i < pageIds.length; i++) {
+        const el = document.getElementById(pageIds[i]);
+        if (!el) continue;
+
+        const dataUrl = await toJpeg(el, {
+          quality: 0.95,
+          pixelRatio: 2,
+          backgroundColor: '#FFFDF7',
+          width: 794,
+          height: 1123,
+          style: {
+            margin: '0',
+            boxShadow: 'none',
+          },
+        });
+
+        if (i > 0) {
+          pdf.addPage('a4', 'portrait');
+        }
+        pdf.addImage(dataUrl, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      }
+
+      const groupSlug = answers.groupName
+        ? answers.groupName.trim().replace(/[^a-zA-Z0-9_-]/g, '_')
+        : 'Kelas_VIII';
+      pdf.save(`E-LKPD_Stylist_Studio_Palembang_Heritage_${groupSlug}.pdf`);
+      soundEngine.playSuccessChime();
+    } catch (err) {
+      console.error('Gagal mengunduh PDF:', err);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen relative">
-      {/* Top Progress & Page Navigation Bar (Hidden when printing) */}
-      <header
-        className="no-print fixed top-0 left-0 right-0 z-40 bg-[#1E3A8A] text-white border-b-2 border-[#F472B6] shadow-md"
-        style={{ height: '52px' }}
-      >
-        <div className="max-w-[1280px] mx-auto h-full px-4 flex items-center justify-between gap-4">
-          {/* Brand & Progress */}
-          <div className="flex items-center gap-3">
-            <span className="font-extrabold text-sm tracking-tight bg-[#EC4899] px-3 py-1 rounded-full border border-white whitespace-nowrap">
-              STYLIST STUDIO VIII
+    <div className="min-h-screen pb-14 select-none">
+      {/* ==================== TOP FLOATING NAVIGATION & PROGRESS BAR ==================== */}
+      <header className="no-print sticky top-0 z-50 bg-[#451A03] text-[#FEF3C7] border-b-4 border-[#F59E0B] shadow-lg px-4 py-2.5">
+        <div className="max-w-[980px] mx-auto flex flex-wrap items-center justify-between gap-2">
+          {/* Identitas Brand E-LKPD */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-md bg-[#881337] border-2 border-[#FBBF24] font-extrabold text-xs tracking-wide text-[#FEF3C7] shadow-sm">
+              STYLIST STUDIO • PALEMBANG HERITAGE
             </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#FEF3C7] whitespace-nowrap">
-                Progres Pengerjaan:
-              </span>
-              <div
-                className="w-36 h-3.5 bg-slate-800 rounded-full overflow-hidden border border-[#93C5FD]"
-                role="progressbar"
-                aria-valuenow={progressPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Progres pengerjaan E-LKPD"
-              >
+            <div className="hidden sm:flex items-center gap-2 bg-[#291811] px-2.5 py-1 rounded-md border border-[#92400E]">
+              <span className="text-[11px] font-bold text-[#FDE68A]">Progres E-LKPD:</span>
+              <div className="w-24 h-2.5 bg-[#451A03] rounded-full overflow-hidden border border-[#B45309]">
                 <div
-                  className="h-full bg-gradient-to-r from-[#FACC15] to-[#F472B6] transition-all duration-300"
+                  className="h-full bg-[#F59E0B] transition-all duration-300"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <span className="text-xs font-extrabold text-[#FACC15] tabular-nums">
-                {progressPct}%
-              </span>
+              <span className="text-[11px] font-extrabold text-[#FDE047]">{progressPct}%</span>
             </div>
           </div>
 
-          {/* Quick Jump to 5 Pages */}
-          <nav className="hidden lg:flex items-center gap-1.5 text-xs font-bold" aria-label="Navigasi Halaman">
-            {[1, 2, 3, 4, 5].map((p) => (
-              <a
+          {/* Navigasi 4 Halaman */}
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4].map((p) => (
+              <button
                 key={p}
-                href={`#halaman-${p}`}
-                className="px-2.5 py-1 rounded bg-[#2563EB] hover:bg-[#EC4899] text-white transition-colors whitespace-nowrap"
+                type="button"
+                onClick={() => scrollToPage(p)}
+                className="px-2.5 py-1 rounded bg-[#7F1D1D] hover:bg-[#991B1B] text-[#FEF3C7] font-bold text-xs border border-[#F59E0B] transition cursor-pointer"
               >
                 Hal. {p}
-              </a>
+              </button>
             ))}
-          </nav>
+          </div>
 
-          {/* Floating Audio Bar in Top Right */}
-          <div className="flex items-center gap-2 shrink-0" role="region" aria-label="Kontrol Audio">
+          {/* Kontrol Audio & Download PDF */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={handleToggleBgm}
-              className={`px-3 py-1.5 rounded-full text-xs font-extrabold border-2 border-white transition-colors cursor-pointer whitespace-nowrap ${
-                bgmOn ? 'bg-[#16A34A] text-white' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              data-testid="btn-download-pdf-top"
+              className={`px-3 py-1 rounded font-extrabold text-xs border-2 transition cursor-pointer ${
+                isDownloadingPdf
+                  ? 'bg-[#78350F] border-[#FDE68A] text-[#FEF3C7] opacity-80 cursor-wait'
+                  : 'bg-[#F59E0B] hover:bg-[#D97706] border-[#FEF3C7] text-[#451A03]'
               }`}
             >
-              Musik BGM: {bgmOn ? 'ON' : 'OFF'}
+              {isDownloadingPdf ? 'Menyiapkan PDF...' : 'Download PDF'}
             </button>
             <button
               type="button"
-              onClick={handleToggleSfx}
-              className={`px-3 py-1.5 rounded-full text-xs font-extrabold border-2 border-white transition-colors cursor-pointer whitespace-nowrap ${
-                sfxOn ? 'bg-[#EC4899] text-white' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+              onClick={toggleBgm}
+              className={`px-2.5 py-1 rounded font-bold text-xs border transition cursor-pointer ${
+                bgmOn
+                  ? 'bg-[#15803D] border-[#DCFCE7] text-white'
+                  : 'bg-[#291811] border-[#92400E] text-[#FDE68A]'
               }`}
             >
-              Efek Suara: {sfxOn ? 'ON' : 'OFF'}
+              BGM: {bgmOn ? 'ON' : 'OFF'}
+            </button>
+            <button
+              type="button"
+              onClick={toggleSfx}
+              className={`px-2.5 py-1 rounded font-bold text-xs border transition cursor-pointer ${
+                sfxOn
+                  ? 'bg-[#9A3412] border-[#FDE68A] text-[#FEF3C7]'
+                  : 'bg-[#291811] border-[#92400E] text-[#FDE68A]'
+              }`}
+            >
+              SFX: {sfxOn ? 'ON' : 'OFF'}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main 5-Page A4 Vertical Workspace */}
-      <main className="lkpd-workspace">
+      {/* ==================== CONTAINER 4 HALAMAN KERTAS A4 ==================== */}
+      <main className="pt-6 px-2 flex flex-col items-center">
         {/* ====================================================================
-            HALAMAN 1: HALAMAN SAMPUL / COVER LKPD (794px x 1123px)
-           ==================================================================== */}
-        <section
-          id="halaman-1"
-          className="a4-page"
-          aria-label="Halaman 1: Sampul E-LKPD"
-        >
-          {/* Bingkai Dekoratif Ganda (X=40px, Y=40px, W=714px, H=1043px, radius=18px) */}
+            HALAMAN 1: SAMPUL & IDENTITAS KELOMPOK
+            ==================================================================== */}
+        <section id="halaman-1" className="a4-page" aria-label="Halaman 1 Sampul dan Identitas">
+          {/* Bingkai Ornamen Songket Palembang */}
           <div
             style={{
               position: 'absolute',
               left: '40px',
-              top: '40px',
+              top: '36px',
               width: '714px',
-              height: '1043px',
-              borderRadius: '18px',
-              border: '3px solid #1E3A8A',
-              padding: '6px',
+              height: '1051px',
+              border: '3px solid #7F1D1D',
+              borderRadius: '14px',
               pointerEvents: 'none',
             }}
-          >
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '12px',
-                border: '2px dashed #F472B6',
-              }}
-            />
-          </div>
-
-          {/* 1. Pita Identitas Kurikulum (X = 197px, Y = 72px | Lebar 400px, Tinggi 36px) */}
+          />
           <div
             style={{
               position: 'absolute',
-              left: '197px',
-              top: '72px',
-              width: '400px',
-              height: '36px',
-              backgroundColor: '#1E3A8A',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF',
-              fontSize: '13.3px',
-              fontWeight: 700,
-              letterSpacing: '0.03em',
+              left: '47px',
+              top: '43px',
+              width: '700px',
+              height: '1037px',
+              border: '1.5px dashed #B45309',
+              borderRadius: '10px',
+              pointerEvents: 'none',
             }}
-          >
-            KURIKULUM MERDEKA - FASE D SMP/MTs
-          </div>
+          />
 
-          {/* 2. Blok Judul Utama Cover (X = 76px, Y = 128px | Lebar 642px, Tinggi 85px) */}
+          {/* Konten Area Kerja Aktif (X = 76px .. 718px | Lebar 642px) */}
           <div
             style={{
               position: 'absolute',
               left: '76px',
-              top: '128px',
+              top: '54px',
               width: '642px',
-              height: '85px',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
+              height: '1015px',
             }}
+            className="flex flex-col justify-between"
           >
-            <h1 className="cover-h1 m-0" style={{ color: '#0F172A' }}>
-              LEMBAR KERJA PESERTA DIDIK
-            </h1>
-            <div className="cover-h1" style={{ color: '#EC4899' }}>
-              (E-LKPD INTERAKTIF)
-            </div>
-          </div>
-
-          {/* 3. Blok Subjudul Materi (X = 97px, Y = 222px | Lebar 600px, Tinggi 75px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '97px',
-              top: '222px',
-              width: '600px',
-              height: '75px',
-              backgroundColor: '#FFFBEB',
-              border: '2px solid #FBBF24',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-              padding: '6px 12px',
-            }}
-          >
-            <h2
-              className="m-0 whitespace-nowrap"
-              style={{
-                fontSize: '15.2px',
-                fontWeight: 800,
-                lineHeight: 1.35,
-                color: '#1E3A8A',
-              }}
-            >
-              TOPIK: PELUANG TEORETIS, FREKUENSI RELATIF, &amp; FREKUENSI HARAPAN
-            </h2>
-            <div
-              className="whitespace-nowrap"
-              style={{
-                fontSize: '14px',
-                fontWeight: 700,
-                color: '#B45309',
-                marginTop: '4px',
-              }}
-            >
-              Petualangan Matematika di Butik Digital &apos;Stylist Studio&apos; (4 JP)
-            </div>
-          </div>
-
-          {/* 4. Area Ilustrasi Sampul Lucu (X = 137px, Y = 315px | Lebar 520px, Tinggi 265px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '137px',
-              top: '315px',
-              width: '520px',
-              height: '265px',
-              background: 'linear-gradient(180deg, #E0F2FE 0%, #FFFBEB 45%, #FDF2F8 100%)',
-              border: '3px solid #1E293B',
-              borderRadius: '16px',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Atap Kanopi Belang Pink-Putih */}
-            <div
-              className="boutique-canopy flex items-center justify-between px-3"
-              style={{ width: '100%', height: '26px' }}
-            >
-              <span className="bg-[#3B4252] text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-white">
-                ♦ #GL2 STYLIST STUDIO
-              </span>
-              <span className="bg-[#EC4899] text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-white">
-                DRESS-UP MATH
-              </span>
-            </div>
-
-            {/* Ilustrasi Sampul Gacha Life 2 Style: 3 Kemeja di Kiri, Gacha Chibi di Tengah, 2 Celana di Kanan + Balon P(B)=1/6 */}
-            <div className="relative w-full h-[233px] flex items-center justify-between px-3">
-              {/* Kiri: Gacha Customize Slot - 3 Kemeja (Merah, Biru, Kuning) */}
-              <div
-                style={{ width: '166px' }}
-                className="flex flex-col items-center bg-[#4A4E69] border-2 border-[#1E293B] rounded-xl overflow-hidden shadow-sm"
-              >
-                <div className="w-full bg-[#3B3F58] text-white text-[10px] font-extrabold text-center py-1 border-b border-[#1E293B]">
-                  UPPER: 3 KEMEJA (M, B, K)
-                </div>
-                <div className="flex items-center justify-center gap-1 p-1.5 bg-[#E0E7FF] w-full">
-                  {(['M', 'B', 'K'] as ShirtCode[]).map((c) => (
-                    <div
-                      key={c}
-                      className="flex flex-col items-center bg-white border border-[#4A4E69] rounded-lg p-0.5"
-                    >
-                      <ShirtSvg code={c} width={44} height={42} />
-                      <span className="text-[9.5px] font-extrabold text-[#1E293B]">{c}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* 1. Header Kurikulum & Judul Utama */}
+            <div className="flex flex-col items-center text-center">
+              <div className="px-5 py-1 rounded-md bg-[#7F1D1D] border-2 border-[#F59E0B] text-[#FEF3C7] text-[11px] font-extrabold tracking-wider uppercase shadow-sm">
+                KURIKULUM MERDEKA • MATEMATIKA SMP/MTs FASE D KELAS VIII
               </div>
 
-              {/* Tengah: Karakter Chibi Gacha Life 2 + Balon Teks P(B) = 1/6 */}
-              <div className="relative flex flex-col items-center justify-center">
-                {/* Balon Teks Lucu */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '2px',
-                    right: '-44px',
-                    backgroundColor: '#FFFFFF',
-                    border: '2.5px solid #1E293B',
-                    borderRadius: '14px',
-                    padding: '2px 8px',
-                    fontSize: '11.5px',
-                    fontWeight: 800,
-                    color: '#1E3A8A',
-                    boxShadow: '0 3px 0 #F472B6',
-                    zIndex: 10,
-                    whiteSpace: 'nowrap',
-                  }}
+              <h1 className="mt-2 text-[25px] font-black tracking-tight text-[#451A03] leading-tight">
+                LEMBAR KERJA PESERTA DIDIK (E-LKPD INTERAKTIF)
+              </h1>
+              <div className="text-[19px] font-black text-[#881337] tracking-wide">
+                STYLIST STUDIO – PALEMBANG HERITAGE EDITION
+              </div>
+
+              {/* Kotak Topik, 3 Badge Materi, & Subjudul */}
+              <div className="mt-2 w-full bg-[#FEF3C7] border-2 border-[#92400E] rounded-xl px-4 py-2 shadow-sm">
+                <div className="text-[12.5px] font-extrabold text-[#7F1D1D] uppercase tracking-wide">
+                  TOPIK: PELUANG TEORETIS, FREKUENSI RELATIF, &amp; FREKUENSI HARAPAN
+                </div>
+
+                {/* 3 Badge Materi Pembelajaran */}
+                <div className="mt-1.5 flex items-center justify-center gap-2">
+                  <span className="px-3 py-0.5 rounded bg-[#881337] text-[#FEF3C7] border border-[#F59E0B] text-[11px] font-extrabold">
+                    1. Peluang Teoretis
+                  </span>
+                  <span className="px-3 py-0.5 rounded bg-[#9A3412] text-[#FEF3C7] border border-[#F59E0B] text-[11px] font-extrabold">
+                    2. Frekuensi Relatif
+                  </span>
+                  <span className="px-3 py-0.5 rounded bg-[#451A03] text-[#FDE047] border border-[#F59E0B] text-[11px] font-extrabold">
+                    3. Frekuensi Harapan
+                  </span>
+                </div>
+
+                <div className="mt-1 text-[12.5px] font-bold text-[#92400E]">
+                  Eksplorasi Matematika melalui Busana Adat Sumatera Selatan (Alokasi: 4 JP)
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Panggung Butik Busana Adat Palembang (Animasi Berganti 6 Pasangan Setiap 1 Detik) */}
+            <div className="w-full bg-[#FFFBEB] border-[3px] border-[#78350F] rounded-2xl overflow-hidden shadow-md">
+              <TumpalBorderSvg width={636} height={15} />
+
+              <div className="relative h-[300px] px-4 py-2 flex items-center justify-between bg-[#FFFDF7]">
+                {/* Ornamen Interior Butik Palembang di Latar Belakang */}
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  viewBox="0 0 642 300"
+                  fill="none"
                 >
-                  <span className="math-var">P(B)</span> = 1/6
-                </div>
-                <ChibiCharacterSvg shirt="M" pants="P" width={145} height={212} />
-              </div>
-
-              {/* Kanan: Gacha Customize Slot - 2 Celana (Putih, Hitam) */}
-              <div
-                style={{ width: '138px' }}
-                className="flex flex-col items-center bg-[#4A4E69] border-2 border-[#1E293B] rounded-xl overflow-hidden shadow-sm"
-              >
-                <div className="w-full bg-[#3B3F58] text-white text-[10px] font-extrabold text-center py-1 border-b border-[#1E293B]">
-                  LOWER: 2 CELANA (P, H)
-                </div>
-                <div className="flex items-center justify-center gap-1.5 p-1.5 bg-[#E0E7FF] w-full">
-                  {(['P', 'H'] as PantsCode[]).map((c) => (
-                    <div
-                      key={c}
-                      className="flex flex-col items-center bg-white border border-[#4A4E69] rounded-lg px-1.5 py-0.5"
-                    >
-                      <PantsSvg code={c} width={46} height={42} showHanger />
-                      <span className="text-[9.5px] font-extrabold text-[#1E293B]">{c}</span>
-                    </div>
+                  {/* Dinding Krem Gading dengan Panel Ukiran Kayu Palembang */}
+                  <rect x="0" y="0" width="642" height="236" fill="#FFFBEB" />
+                  {[36, 116, 196, 446, 526, 606].map((x) => (
+                    <line key={x} x1={x} y1="0" x2={x} y2="236" stroke="#FDE68A" strokeWidth="8" />
                   ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 5. Kotak Identitas Kelompok & Kelas (X = 117px, Y = 600px | Lebar 560px, Tinggi 380px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '117px',
-              top: '600px',
-              width: '560px',
-              height: '380px',
-              backgroundColor: '#FFFFFF',
-              border: '2.5px solid #1E3A8A',
-              borderRadius: '14px',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Header Kotak (Tinggi 42px) */}
-            <div
-              style={{
-                width: '100%',
-                height: '42px',
-                backgroundColor: '#1E3A8A',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                fontWeight: 700,
-                letterSpacing: '0.02em',
-              }}
-            >
-              IDENTITAS KELOMPOK &amp; KELAS
-            </div>
-          </div>
-
-          {/* Isi Formulir pada Koordinat Absolut Halaman 1 (Mulai dari X = 145px, lebar area 504px) */}
-          {/* Baris 1 (Y = 660px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '660px',
-              width: '504px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14.5px',
-              fontWeight: 700,
-              color: '#0F172A',
-            }}
-          >
-            <label htmlFor="input-group-name" style={{ width: '155px' }}>
-              Nama Kelompok
-            </label>
-            <span>:</span>
-            <input
-              id="input-group-name"
-              type="text"
-              maxLength={35}
-              placeholder="Contoh: Kelompok 1 (Pascal)"
-              value={answers.groupName}
-              onChange={(e) => updateAnswer('groupName', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '330px', height: '32px' }}
-            />
-          </div>
-
-          {/* Baris 2 (Y = 702px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '702px',
-              width: '504px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14.5px',
-              fontWeight: 700,
-              color: '#0F172A',
-            }}
-          >
-            <label htmlFor="input-class-sem" style={{ width: '155px' }}>
-              Kelas / Semester
-            </label>
-            <span>:</span>
-            <input
-              id="input-class-sem"
-              type="text"
-              maxLength={30}
-              value={answers.classSemester}
-              onChange={(e) => updateAnswer('classSemester', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '330px', height: '32px' }}
-            />
-          </div>
-
-          {/* Baris 3 (Y = 744px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '744px',
-              width: '504px',
-              fontSize: '14.5px',
-              fontWeight: 700,
-              color: '#1E3A8A',
-            }}
-          >
-            Nama Anggota Kelompok (Beserta Nomor Presensi):
-          </div>
-
-          {/* Baris Anggota 1 (Y = 774px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '774px',
-              width: '504px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14px',
-              fontWeight: 700,
-            }}
-          >
-            <label htmlFor="member-1">1.</label>
-            <input
-              id="member-1"
-              type="text"
-              maxLength={48}
-              placeholder="Nama Lengkap Anggota 1 (No. Presensi: ...)"
-              value={answers.member1}
-              onChange={(e) => updateAnswer('member1', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '475px', height: '30px' }}
-            />
-          </div>
-
-          {/* Baris Anggota 2 (Y = 812px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '812px',
-              width: '504px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14px',
-              fontWeight: 700,
-            }}
-          >
-            <label htmlFor="member-2">2.</label>
-            <input
-              id="member-2"
-              type="text"
-              maxLength={48}
-              placeholder="Nama Lengkap Anggota 2 (No. Presensi: ...)"
-              value={answers.member2}
-              onChange={(e) => updateAnswer('member2', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '475px', height: '30px' }}
-            />
-          </div>
-
-          {/* Baris Anggota 3 (Y = 850px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '850px',
-              width: '504px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14px',
-              fontWeight: 700,
-            }}
-          >
-            <label htmlFor="member-3">3.</label>
-            <input
-              id="member-3"
-              type="text"
-              maxLength={48}
-              placeholder="Nama Lengkap Anggota 3 (No. Presensi: ...)"
-              value={answers.member3}
-              onChange={(e) => updateAnswer('member3', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '475px', height: '30px' }}
-            />
-          </div>
-
-          {/* Baris Anggota 4 (Y = 888px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '888px',
-              width: '504px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14px',
-              fontWeight: 700,
-            }}
-          >
-            <label htmlFor="member-4">4.</label>
-            <input
-              id="member-4"
-              type="text"
-              maxLength={48}
-              placeholder="Nama Lengkap Anggota 4 (No. Presensi: ...)"
-              value={answers.member4}
-              onChange={(e) => updateAnswer('member4', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '475px', height: '30px' }}
-            />
-          </div>
-
-          {/* Baris Anggota 5 (Y = 926px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '145px',
-              top: '926px',
-              width: '504px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '14px',
-              fontWeight: 700,
-            }}
-          >
-            <label htmlFor="member-5">5.</label>
-            <input
-              id="member-5"
-              type="text"
-              maxLength={48}
-              placeholder="Nama Lengkap Anggota 5 (Opsional)"
-              value={answers.member5}
-              onChange={(e) => updateAnswer('member5', e.target.value)}
-              className="student-input left-align"
-              style={{ width: '475px', height: '30px' }}
-            />
-          </div>
-
-          {/* 6. Footer Sampul (X = 76px, Y = 1005px | Lebar 642px, Tinggi 55px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '1005px',
-              width: '642px',
-              height: '55px',
-              textAlign: 'center',
-              fontSize: '13.3px',
-              fontWeight: 600,
-              color: '#475569',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              lineHeight: 1.45,
-            }}
-          >
-            <div>MATA PELAJARAN MATEMATIKA - FASE D KELAS VIII SMP/MTs</div>
-            <div>Berdasarkan CP SK Kepala BSKAP Nomor 046/H/KR/2025</div>
-          </div>
-        </section>
-
-        {/* ====================================================================
-            HALAMAN 2: PETUNJUK, CP & TP, RINGKASAN MATERI, & APERSEPSI
-           ==================================================================== */}
-        <section
-          id="halaman-2"
-          className="a4-page"
-          aria-label="Halaman 2: Petunjuk, CP & TP, Materi, dan Apersepsi"
-        >
-          {/* 1. Running Header Halaman 2 (X = 76px, Y = 45px | Lebar 642px, Tinggi 32px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '45px',
-              width: '642px',
-              height: '32px',
-              borderBottom: '2px solid #1E3A8A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#1E3A8A',
-            }}
-          >
-            <span>E-LKPD MATEMATIKA KELAS VIII: STYLIST STUDIO</span>
-            <span>Halaman 2 dari 5</span>
-          </div>
-
-          {/* 2. Kotak A: Petunjuk Penggunaan E-LKPD (X = 76px, Y = 90px | Lebar 642px, Tinggi 205px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '90px',
-              width: '642px',
-              height: '205px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h3
-              className="m-0 mb-1.5"
-              style={{ fontSize: '15.5px', fontWeight: 700, color: '#1E3A8A' }}
-            >
-              A. PETUNJUK PENGGUNAAN E-LKPD
-            </h3>
-            <ol
-              className="numbered-list m-0 pl-5 space-y-1"
-              style={{ fontSize: '13.4px', lineHeight: 1.44, color: '#0F172A' }}
-            >
-              <li>Berdoalah terlebih dahulu sebelum memulai kegiatan pembelajaran ini.</li>
-              <li>Tuliskan nama kelompok, kelas, dan nama anggota kelompok pada halaman sampul.</li>
-              <li>Bacalah Capaian Pembelajaran dan Tujuan Pembelajaran dengan cermat.</li>
-              <li>Gunakan simulator karakter Chibi &quot;Stylist Studio&quot; untuk eksplorasi data.</li>
-              <li>Diskusikan setiap pertanyaan bersama anggota kelompokmu dan isilah kotak kuning.</li>
-              <li>Periksa kembali seluruh jawabanmu sebelum menekan tombol evaluasi di halaman akhir.</li>
-            </ol>
-          </div>
-
-          {/* 3. Kotak B: Capaian & Tujuan Pembelajaran (X = 76px, Y = 310px | Lebar 642px, Tinggi 245px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '310px',
-              width: '642px',
-              height: '245px',
-              backgroundColor: '#EFF6FF',
-              border: '1.5px solid #93C5FD',
-              borderLeft: '5px solid #1E3A8A',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h3
-              className="m-0 mb-1.5"
-              style={{ fontSize: '15.5px', fontWeight: 700, color: '#1E3A8A' }}
-            >
-              B. CAPAIAN &amp; TUJUAN PEMBELAJARAN
-            </h3>
-            <div style={{ fontSize: '12.9px', lineHeight: 1.44, color: '#0F172A' }}>
-              <p className="m-0 mb-2">
-                <strong className="text-[#1E3A8A]">Capaian Pembelajaran (SK BSKAP 046/H/KR/2025):</strong>{' '}
-                &quot;Murid dapat menjelaskan dan menggunakan pengertian peluang dan frekuensi relatif untuk menentukan frekuensi harapan satu kejadian pada suatu percobaan sederhana (semua hasil percobaan dapat muncul secara merata).&quot;
-              </p>
-              <div className="space-y-1.5">
-                <div>
-                  <strong className="text-[#1E3A8A]">• TP.K1 (2 JP):</strong> Peserta didik dapat menjelaskan pengertian peluang teoretis dan menggunakannya untuk menentukan frekuensi harapan suatu kejadian pada percobaan sederhana dengan tepat.
-                </div>
-                <div>
-                  <strong className="text-[#1E3A8A]">• TP.K2 (2 JP):</strong> Peserta didik dapat menjelaskan pengertian frekuensi relatif dan menggunakannya untuk memperkirakan frekuensi harapan serta membandingkannya terhadap nilai peluang teoretis pada percobaan sederhana.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Kotak C: Informasi Pendukung / Ringkasan Materi Pokok (X = 76px, Y = 570px | Lebar 642px, Tinggi 240px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '570px',
-              width: '642px',
-              height: '240px',
-              backgroundColor: '#FFFBEB',
-              border: '2px solid #FBBF24',
-              borderRadius: '10px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h3
-              className="m-0 mb-1"
-              style={{ fontSize: '15.5px', fontWeight: 700, color: '#92400E' }}
-            >
-              C. INFORMASI PENDUKUNG (RINGKASAN MATERI POKOK)
-            </h3>
-            <ol
-              className="numbered-list m-0 pl-5 space-y-1"
-              style={{ fontSize: '12.6px', lineHeight: 1.34, color: '#0F172A' }}
-            >
-              <li>
-                <strong>Ruang Sampel (<span className="math-var">S</span>)</strong> adalah himpunan seluruh hasil yang mungkin muncul pada percobaan sederhana. Setiap anggota dari <span className="math-var">S</span> disebut <strong>Titik Sampel</strong>, dan banyak anggota ruang sampel dilambangkan dengan <span className="math-var">n(S)</span>.
-              </li>
-              <li>
-                <strong>Peluang Teoretis <span className="math-var">P(A)</span></strong> adalah rasio banyaknya kejadian <span className="math-var">A</span> terhadap total anggota ruang sampel:{' '}
-                <span className="math-var">P(A) = n(A) / n(S)</span> ={' '}
-                <span className="fraction" style={{ fontSize: '11px', lineHeight: 1.02 }}>
-                  <span className="num math-var" style={{ padding: '0 4px' }}>n(A)</span>
-                  <span className="den math-var" style={{ padding: '0 4px' }}>n(S)</span>
-                </span>.
-              </li>
-              <li>
-                <strong>Frekuensi Relatif / Peluang Empiris (<span className="math-var">f_r</span>)</strong> adalah perbandingan kemunculan kejadian pada percobaan nyata (<span className="math-var">k</span>) terhadap banyak percobaan (<span className="math-var">N</span>):{' '}
-                <span className="math-var">f_r = k / N</span> ={' '}
-                <span className="fraction" style={{ fontSize: '11px', lineHeight: 1.02 }}>
-                  <span className="num math-var" style={{ padding: '0 4px' }}>k</span>
-                  <span className="den math-var" style={{ padding: '0 4px' }}>N</span>
-                </span>.
-              </li>
-              <li>
-                <strong>Frekuensi Harapan (<span className="math-var">F_h</span>)</strong> adalah estimasi banyaknya kejadian <span className="math-var">A</span> terjadi dalam <span className="math-var">N</span> kali percobaan:{' '}
-                <span className="math-var">F_h = N × P(A)</span> atau <span className="math-var">F_h = N × f_r</span>.
-              </li>
-            </ol>
-          </div>
-
-          {/* 5. Kotak D: Apersepsi Materi Prasyarat (TP.P1 & TP.P2) (X = 76px, Y = 825px | Lebar 642px, Tinggi 220px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '825px',
-              width: '642px',
-              height: '220px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #2563EB',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h3
-              className="m-0 mb-2.5"
-              style={{ fontSize: '15.5px', fontWeight: 700, color: '#2563EB' }}
-            >
-              D. APERSEPSI: MATERI PRASYARAT PECAHAN (TP.P1 &amp; TP.P2)
-            </h3>
-
-            {/* Baris 1 (TP.P1 - Menyederhanakan Pecahan) */}
-            <div
-              className="flex items-center gap-2 mb-3 bg-[#EFF6FF] px-3 py-1.5 rounded-lg whitespace-nowrap"
-              style={{ fontSize: '14px', fontWeight: 600 }}
-            >
-              <span>1. Sederhanakan pecahan biasa berikut:</span>
-              <span className="fraction">
-                <span className="num">2</span>
-                <span className="den">6</span>
-              </span>
-              <span>=</span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Apersepsi 1 Pembilang 2/6"
-                    value={answers.ap1_num1}
-                    onChange={(e) => updateAnswer('ap1_num1', e.target.value)}
-                    className={getFieldClass('ap1_num1')}
-                    style={{ width: '42px', height: '25px' }}
+                  {/* Gebyok / Lengkung Ukiran Emas Palembang di Tengah */}
+                  <path
+                    d="M206 236 V54 C206 14, 436 14, 436 54 V236 Z"
+                    fill="#7F1D1D"
+                    stroke="#451A03"
+                    strokeWidth="3"
                   />
-                </span>
-                <span className="den">
-                  <input
-                    type="text"
-                    aria-label="Apersepsi 1 Penyebut 2/6"
-                    value={answers.ap1_den1}
-                    onChange={(e) => updateAnswer('ap1_den1', e.target.value)}
-                    className={getFieldClass('ap1_den1')}
-                    style={{ width: '42px', height: '25px' }}
+                  <path
+                    d="M216 236 V58 C216 24, 426 24, 426 58 V236 Z"
+                    fill="#FFFDF7"
+                    stroke="#F59E0B"
+                    strokeWidth="2.5"
                   />
-                </span>
-              </span>
-              <span>dan</span>
-              <span className="fraction">
-                <span className="num">6</span>
-                <span className="den">30</span>
-              </span>
-              <span>=</span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Apersepsi 1 Pembilang 6/30"
-                    value={answers.ap1_num2}
-                    onChange={(e) => updateAnswer('ap1_num2', e.target.value)}
-                    className={getFieldClass('ap1_num2')}
-                    style={{ width: '42px', height: '25px' }}
-                  />
-                </span>
-                <span className="den">
-                  <input
-                    type="text"
-                    aria-label="Apersepsi 1 Penyebut 6/30"
-                    value={answers.ap1_den2}
-                    onChange={(e) => updateAnswer('ap1_den2', e.target.value)}
-                    className={getFieldClass('ap1_den2')}
-                    style={{ width: '42px', height: '25px' }}
-                  />
-                </span>
-              </span>
-              <span>.</span>
-            </div>
+                  {/* Lis Dinding Songket & Lantai Kayu Jati */}
+                  <rect x="0" y="224" width="642" height="14" fill="#9A3412" stroke="#451A03" strokeWidth="2" />
+                  <rect x="0" y="238" width="642" height="62" fill="#FDE68A" />
+                  <line x1="0" y1="258" x2="642" y2="258" stroke="#D97706" strokeWidth="1.5" />
+                  <line x1="0" y1="278" x2="642" y2="278" stroke="#D97706" strokeWidth="1.5" />
+                  {/* Tirai Maroon Keemasan Kiri & Kanan */}
+                  <path d="M0 0 H54 C46 58, 24 98, 0 124 Z" fill="#881337" stroke="#451A03" strokeWidth="2.2" />
+                  <path d="M642 0 H588 C596 58, 618 98, 642 124 Z" fill="#881337" stroke="#451A03" strokeWidth="2.2" />
+                </svg>
 
-            {/* Baris 2 (TP.P2 - Perkalian Bilangan Bulat dan Pecahan) */}
-            <div
-              className="flex items-center gap-2 bg-[#EFF6FF] px-3 py-2 rounded-lg whitespace-nowrap"
-              style={{ fontSize: '14px', fontWeight: 600 }}
-            >
-              <span>2. Hitunglah hasil perkalian berikut:</span>
-              <span>30 × (1/6) =</span>
-              <input
-                type="text"
-                aria-label="Apersepsi 2 Hasil 30 x 1/6"
-                value={answers.ap2_res1}
-                onChange={(e) => updateAnswer('ap2_res1', e.target.value)}
-                className={getFieldClass('ap2_res1')}
-                style={{ width: '50px', height: '28px' }}
-              />
-              <span>dan 60 × (1/6) =</span>
-              <input
-                type="text"
-                aria-label="Apersepsi 2 Hasil 60 x 1/6"
-                value={answers.ap2_res2}
-                onChange={(e) => updateAnswer('ap2_res2', e.target.value)}
-                className={getFieldClass('ap2_res2')}
-                style={{ width: '50px', height: '28px' }}
-              />
-              <span>.</span>
-            </div>
-          </div>
-        </section>
-
-        {/* ====================================================================
-            HALAMAN 3: SIMULATOR CHIBI "STYLIST STUDIO", AKTIVITAS 1, & AKTIVITAS 2
-           ==================================================================== */}
-        <section
-          id="halaman-3"
-          className="a4-page"
-          aria-label="Halaman 3: Simulator Stylist Studio, Aktivitas 1, dan Aktivitas 2"
-        >
-          {/* 1. Running Header Halaman 3 (X = 76px, Y = 45px | Lebar 642px, Tinggi 32px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '45px',
-              width: '642px',
-              height: '32px',
-              borderBottom: '2px solid #1E3A8A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#1E3A8A',
-            }}
-          >
-            <span>E-LKPD MATEMATIKA KELAS VIII: STYLIST STUDIO</span>
-            <span>Halaman 3 dari 5</span>
-          </div>
-
-          {/* 2. Panel Simulator Interaktif "Stylist Studio" (X = 76px, Y = 88px | Lebar 642px, Tinggi 365px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '88px',
-              width: '642px',
-              height: '365px',
-              background: 'linear-gradient(180deg, #E0F2FE 0%, #FFFBEB 50%, #FDF2F8 100%)',
-              border: '3px solid #1E293B',
-              borderRadius: '16px',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Atap Kanopi Butik Belang Pink-Putih setinggi 26px */}
-            <div
-              className="boutique-canopy flex items-center justify-center"
-              style={{ width: '100%', height: '26px' }}
-            >
-              <span className="bg-[#1E3A8A] text-white text-[11px] font-extrabold px-3 py-0.5 rounded-full border border-white">
-                SIMULATOR INTERAKTIF: STYLIST STUDIO (#GL2 EDITION)
-              </span>
-            </div>
-
-            {/* Area Kiri (X_rel = 14px, Lebar 215px): "LEMARI BUTIK" */}
-            <div
-              style={{
-                position: 'absolute',
-                left: '14px',
-                top: '34px',
-                width: '215px',
-                height: '318px',
-                backgroundColor: '#FBBF24',
-                border: '2.5px solid #1E293B',
-                borderRadius: '12px',
-                padding: '6px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                overflow: 'hidden',
-              }}
-            >
-              <div className="text-center text-[11.5px] font-extrabold text-white bg-[#4A4E69] py-1 rounded border border-[#1E293B]">
-                LEMARI BUTIK (CUSTOMIZE)
-              </div>
-
-              {/* Rak Atas: 3 Tombol Gantungan SVG Kemeja M, B, K (Strictly fitted inside 198px width) */}
-              <div className="bg-[#FFFBEB] border-2 border-[#1E293B] rounded-lg p-1">
-                <div className="text-[10px] font-extrabold text-center text-[#92400E] mb-1">
-                  Rak Atas: Pilih 1 dari 3 Kemeja
-                </div>
-                <div className="grid grid-cols-3 gap-1">
-                  {(['M', 'B', 'K'] as ShirtCode[]).map((code) => {
-                    const active = selectedShirt === code;
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => handleSelectShirt(code)}
-                        aria-label={`Pilih Kemeja ${SHIRT_COLORS[code].name} (${code})`}
-                        className={`hanger-btn flex flex-col items-center justify-center py-1 px-0.5 rounded-lg border-2 cursor-pointer ${
-                          active
-                            ? 'bg-[#FCE7F3] border-[#EC4899] shadow-xs'
-                            : 'bg-white border-slate-200 hover:border-slate-400'
-                        }`}
-                      >
-                        <ShirtSvg code={code} width={44} height={42} />
-                        <span className="text-[9.5px] font-extrabold text-[#0F172A] leading-tight whitespace-nowrap">
-                          {SHIRT_COLORS[code].name} ({code})
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Rak Bawah: 2 Tombol SVG Celana P, H */}
-              <div className="bg-[#FFFBEB] border-2 border-[#1E293B] rounded-lg p-1">
-                <div className="text-[10px] font-extrabold text-center text-[#92400E] mb-1">
-                  Rak Bawah: Pilih 1 dari 2 Celana
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 px-2">
-                  {(['P', 'H'] as PantsCode[]).map((code) => {
-                    const active = selectedPants === code;
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => handleSelectPants(code)}
-                        aria-label={`Pilih Celana ${PANTS_COLORS[code].name} (${code})`}
-                        className={`hanger-btn flex flex-col items-center justify-center py-1 px-1 rounded-lg border-2 cursor-pointer ${
-                          active
-                            ? 'bg-[#FCE7F3] border-[#EC4899] shadow-xs'
-                            : 'bg-white border-slate-200 hover:border-slate-400'
-                        }`}
-                      >
-                        <PantsSvg code={code} width={46} height={42} />
-                        <span className="text-[9.5px] font-extrabold text-[#0F172A] leading-tight whitespace-nowrap">
-                          {PANTS_COLORS[code].name} ({code})
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Area Tengah (X_rel = 238px, Lebar 165px): "KARAKTER CHIBI" */}
-            <div
-              style={{
-                position: 'absolute',
-                left: '238px',
-                top: '34px',
-                width: '165px',
-                height: '318px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 0',
-              }}
-            >
-              <div className="text-center text-[11px] font-extrabold text-white bg-[#4A4E69] px-3 py-0.5 rounded-full border-2 border-[#1E293B] shadow-xs">
-                KARAKTER CHIBI
-              </div>
-
-              <div className="flex items-center justify-center">
-                <ChibiCharacterSvg
-                  shirt={selectedShirt}
-                  pants={selectedPants}
-                  popKey={popKey}
-                  width={154}
-                  height={224}
-                />
-              </div>
-
-              <div
-                data-testid="current-outfit-label"
-                className="bg-[#1E3A8A] text-white font-extrabold text-xs px-3.5 py-1 rounded-full border-2 border-[#1E293B] shadow-sm whitespace-nowrap"
-              >
-                Outfit: ({selectedShirt}, {selectedPants})
-              </div>
-            </div>
-
-            {/* Area Kanan (X_rel = 412px, Lebar 216px): "MESIN GACHA RANDOMIZER" */}
-            <div
-              style={{
-                position: 'absolute',
-                left: '412px',
-                top: '34px',
-                width: '216px',
-                height: '318px',
-                backgroundColor: '#FFFFFF',
-                border: '2.5px solid #1E293B',
-                borderRadius: '12px',
-                padding: '7px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                overflow: 'hidden',
-              }}
-            >
-              <div className="text-center text-[11px] font-extrabold text-white bg-[#1E3A8A] py-1 rounded border border-[#1E293B]">
-                MESIN GACHA RANDOMIZER
-              </div>
-
-              {/* Tombol Kapsul 3D */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleRandomizeOne}
-                    className="btn-gacha-1 flex-1 py-1 text-xs font-extrabold text-[#0F172A] cursor-pointer whitespace-nowrap"
-                  >
-                    Acak 1 Kali
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetSimulator}
-                    className="btn-reset px-2 py-1 text-[11px] font-extrabold text-[#0F172A] cursor-pointer whitespace-nowrap"
-                  >
-                    Reset Data
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRandomizeThirty}
-                  className="btn-gacha-30 w-full py-1 text-xs font-extrabold cursor-pointer whitespace-nowrap"
-                >
-                  Randomize 30 Kali
-                </button>
-              </div>
-
-              {/* Tabel Statistik Real-Time (N = 30) */}
-              <div className="border-2 border-[#1E293B] rounded-lg overflow-hidden">
-                <div className="bg-[#EFF6FF] text-[#1E3A8A] text-[10.5px] font-extrabold text-center py-0.5 border-b border-[#1E293B] tabular-nums">
-                  Tabel Statistik Real-Time (N = {totalTrials})
-                </div>
-                <table className="w-full text-[10.5px] border-collapse tabular-nums">
-                  <thead>
-                    <tr className="bg-slate-100 border-b border-slate-300">
-                      <th className="py-0.5 px-2 text-left font-bold">Titik Sampel</th>
-                      <th className="py-0.5 px-2 text-right font-bold">Frekuensi (k)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ALL_OUTFITS.map((item) => {
-                      const isTarget = item.key === 'M,P';
+                {/* Kiri: Daftar 3 Pilihan Atasan Adat */}
+                <div className="relative z-10 w-[184px] bg-[#FFFBEB] border-2 border-[#78350F] rounded-xl p-2 shadow-sm">
+                  <div className="text-[10.5px] font-black text-[#7F1D1D] uppercase tracking-wider border-b border-[#D97706] pb-1 mb-1.5 text-center">
+                    3 Pilihan Atasan Adat
+                  </div>
+                  <div className="space-y-1.5">
+                    {TOP_OPTIONS.map((t) => {
+                      const active = currentCoverOutfit.top === t.code;
                       return (
-                        <tr
-                          key={item.key}
-                          style={{
-                            backgroundColor: isTarget ? '#FEF08A' : '#FFFFFF',
-                            fontWeight: isTarget ? 800 : 600,
-                          }}
-                          className="border-b border-slate-200 last:border-b-0"
+                        <div
+                          key={t.code}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-left transition-all ${
+                            active
+                              ? 'bg-[#881337] text-[#FEF3C7] border-[#FBBF24] shadow-sm'
+                              : 'bg-[#FFFDF7] text-[#451A03] border-[#D97706]'
+                          }`}
                         >
-                          <td className="py-0.5 px-2">{item.label}</td>
-                          <td
-                            className="py-0.5 px-2 text-right"
-                            data-testid={`stat-${item.key}`}
+                          <span
+                            className={`w-6 h-6 rounded flex items-center justify-center font-black text-[10px] shrink-0 ${
+                              active ? 'bg-[#FBBF24] text-[#451A03]' : 'bg-[#FEF3C7] text-[#7F1D1D]'
+                            }`}
                           >
-                            {stats[item.key]}
-                          </td>
-                        </tr>
+                            {t.code}
+                          </span>
+                          <div className="leading-tight">
+                            <div className="text-[10.5px] font-extrabold">{t.shortName}</div>
+                            <div
+                              className={`text-[8.5px] font-semibold ${
+                                active ? 'text-[#FDE68A]' : 'text-[#78350F]'
+                              }`}
+                            >
+                              {t.headpieceNote}
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Kotak Aktivitas 1: Mendaftar Ruang Sampel dengan Tabel Silang (TP.D1) (X = 76px, Y = 468px | Lebar 642px, Tinggi 325px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '468px',
-              width: '642px',
-              height: '325px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h3
-              className="m-0 mb-1"
-              style={{ fontSize: '15.8px', fontWeight: 700, color: '#1E3A8A' }}
-            >
-              1. AKTIVITAS 1: MENDAFTAR RUANG SAMPEL DENGAN TABEL SILANG (TP.D1)
-            </h3>
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.2px', lineHeight: 1.38, color: '#0F172A' }}
-            >
-              Cobalah memasangkan 3 kemeja (M, B, K) dan 2 celana (P, H) pada karakter Chibi di atas, lalu lengkapi tabel silang berikut untuk mendaftar seluruh anggota ruang sampel <span className="math-var">S</span>!
-            </p>
-
-            {/* Tabel Silang 3x2 (Lebar 562px) */}
-            <table
-              style={{ width: '562px', margin: '0 auto 8px auto' }}
-              className="border-2 border-[#1E3A8A] border-collapse text-center text-[13px]"
-            >
-              <thead>
-                <tr className="bg-[#1E3A8A] text-white font-bold">
-                  <th className="border border-[#93C5FD] py-1 px-3 w-[202px]">
-                    Kemeja \ Celana
-                  </th>
-                  <th className="border border-[#93C5FD] py-1 px-3 w-[180px]">
-                    Celana Putih (P)
-                  </th>
-                  <th className="border border-[#93C5FD] py-1 px-3 w-[180px]">
-                    Celana Hitam (H)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Baris Kemeja Merah (M) */}
-                <tr>
-                  <td className="border border-slate-300 py-1 px-3 font-bold bg-[#FFF1F2] text-left">
-                    Kemeja Merah (M)
-                  </td>
-                  <td className="border border-slate-300 py-1 px-3 font-extrabold bg-[#FEF08A]">
-                    (M, P)
-                  </td>
-                  <td className="border border-slate-300 py-1 px-3">
-                    <input
-                      type="text"
-                      aria-label="Titik sampel Kemeja Merah dan Celana Hitam"
-                      placeholder="(..., ...)"
-                      value={answers.act1_MH}
-                      onChange={(e) => updateAnswer('act1_MH', e.target.value)}
-                      className={getFieldClass('act1_MH')}
-                      style={{ width: '108px', height: '24px' }}
-                    />
-                  </td>
-                </tr>
-                {/* Baris Kemeja Biru (B) */}
-                <tr>
-                  <td className="border border-slate-300 py-1 px-3 font-bold bg-[#EFF6FF] text-left">
-                    Kemeja Biru (B)
-                  </td>
-                  <td className="border border-slate-300 py-1 px-3">
-                    <input
-                      type="text"
-                      aria-label="Titik sampel Kemeja Biru dan Celana Putih"
-                      placeholder="(..., ...)"
-                      value={answers.act1_BP}
-                      onChange={(e) => updateAnswer('act1_BP', e.target.value)}
-                      className={getFieldClass('act1_BP')}
-                      style={{ width: '108px', height: '24px' }}
-                    />
-                  </td>
-                  <td className="border border-slate-300 py-1 px-3 font-extrabold bg-slate-50">
-                    (B, H)
-                  </td>
-                </tr>
-                {/* Baris Kemeja Kuning (K) */}
-                <tr>
-                  <td className="border border-slate-300 py-1 px-3 font-bold bg-[#FEFCE8] text-left">
-                    Kemeja Kuning (K)
-                  </td>
-                  <td className="border border-slate-300 py-1 px-3">
-                    <input
-                      type="text"
-                      aria-label="Titik sampel Kemeja Kuning dan Celana Putih"
-                      placeholder="(..., ...)"
-                      value={answers.act1_KP}
-                      onChange={(e) => updateAnswer('act1_KP', e.target.value)}
-                      className={getFieldClass('act1_KP')}
-                      style={{ width: '108px', height: '24px' }}
-                    />
-                  </td>
-                  <td className="border border-slate-300 py-1 px-3">
-                    <input
-                      type="text"
-                      aria-label="Titik sampel Kemeja Kuning dan Celana Hitam"
-                      placeholder="(..., ...)"
-                      value={answers.act1_KH}
-                      onChange={(e) => updateAnswer('act1_KH', e.target.value)}
-                      className={getFieldClass('act1_KH')}
-                      style={{ width: '108px', height: '24px' }}
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* Isian di bawah tabel */}
-            <div className="space-y-1 text-[13.4px] font-semibold">
-              <div className="flex items-center gap-2">
-                <span>• Banyak seluruh anggota ruang sampel adalah</span>
-                <span className="math-var">n(S)</span>
-                <span>=</span>
-                <input
-                  type="text"
-                  aria-label="Banyak anggota ruang sampel n(S)"
-                  value={answers.act1_nS}
-                  onChange={(e) => updateAnswer('act1_nS', e.target.value)}
-                  className={getFieldClass('act1_nS')}
-                  style={{ width: '48px', height: '25px' }}
-                />
-                <span>pasangan pakaian.</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>
-                  • Anggota Kejadian Kemeja Merah &amp; Celana Putih: <span className="math-var">B</span> = &#123;(M, P)&#125; &rarr; <span className="math-var">n(B)</span> =
-                </span>
-                <input
-                  type="text"
-                  aria-label="Banyak anggota kejadian n(B)"
-                  value={answers.act1_nB}
-                  onChange={(e) => updateAnswer('act1_nB', e.target.value)}
-                  className={getFieldClass('act1_nB')}
-                  style={{ width: '48px', height: '25px' }}
-                />
-                <span>.</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Kotak Aktivitas 2: Menentukan Peluang Teoretis (TP.D2) (X = 76px, Y = 808px | Lebar 642px, Tinggi 242px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '808px',
-              width: '642px',
-              height: '242px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h3
-              className="m-0 mb-1"
-              style={{ fontSize: '15.8px', fontWeight: 700, color: '#1E3A8A' }}
-            >
-              2. AKTIVITAS 2: MENENTUKAN PELUANG TEORETIS P(B) (TP.D2)
-            </h3>
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.4px', lineHeight: 1.42, color: '#0F172A' }}
-            >
-              Karena semua pasangan pakaian dapat muncul secara merata, tentukan nilai Peluang Teoretis terpilihnya pasangan Kemeja Merah dan Celana Putih atau <span className="math-var">P(B)</span>!
-            </p>
-
-            {/* Kotak Rumus Pecahan Vertikal (Latar #F1F5F9) */}
-            <div
-              className="flex items-center justify-center gap-3 py-1.5 px-4 rounded-xl mb-2"
-              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.5px', fontWeight: 700 }}
-            >
-              <span>
-                Peluang Teoretis <span className="math-var">P(B)</span> =
-              </span>
-              <span className="fraction">
-                <span className="num math-var">n(B)</span>
-                <span className="den math-var">n(S)</span>
-              </span>
-              <span>=</span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Pembilang Peluang Teoretis P(B)"
-                    value={answers.act2_num}
-                    onChange={(e) => updateAnswer('act2_num', e.target.value)}
-                    className={getFieldClass('act2_num')}
-                    style={{ width: '48px', height: '24px' }}
-                  />
-                </span>
-                <span className="den">
-                  <input
-                    type="text"
-                    aria-label="Penyebut Peluang Teoretis P(B)"
-                    value={answers.act2_den}
-                    onChange={(e) => updateAnswer('act2_den', e.target.value)}
-                    className={getFieldClass('act2_den')}
-                    style={{ width: '48px', height: '24px' }}
-                  />
-                </span>
-              </span>
-            </div>
-
-            {/* Kalimat Pemahaman */}
-            <div style={{ fontSize: '13.4px', lineHeight: 1.55, fontWeight: 600 }}>
-              Pengertian peluang teoretis adalah rasio banyaknya titik sampel kejadian{' '}
-              <select
-                aria-label="Dropdown Pengertian Peluang Teoretis 1"
-                value={answers.act2_drop1}
-                onChange={(e) => updateAnswer('act2_drop1', e.target.value)}
-                className={getFieldClass('act2_drop1')}
-                style={{ width: '92px', height: '26px', padding: '0 4px' }}
-              >
-                <option value="">-- Pilih --</option>
-                <option value="n(B)">n(B)</option>
-                <option value="n(S)">n(S)</option>
-                <option value="N">N</option>
-              </select>{' '}
-              terhadap total anggota ruang sampel{' '}
-              <select
-                aria-label="Dropdown Pengertian Peluang Teoretis 2"
-                value={answers.act2_drop2}
-                onChange={(e) => updateAnswer('act2_drop2', e.target.value)}
-                className={getFieldClass('act2_drop2')}
-                style={{ width: '92px', height: '26px', padding: '0 4px' }}
-              >
-                <option value="">-- Pilih --</option>
-                <option value="n(B)">n(B)</option>
-                <option value="n(S)">n(S)</option>
-                <option value="k">k</option>
-              </select>
-              .
-            </div>
-          </div>
-        </section>
-
-        {/* ====================================================================
-            HALAMAN 4: AKTIVITAS 3 (BAGIAN 3.1 S.D. 3.4) & KESIMPULAN
-           ==================================================================== */}
-        <section
-          id="halaman-4"
-          className="a4-page"
-          aria-label="Halaman 4: Aktivitas 3 Frekuensi Harapan & Frekuensi Relatif"
-        >
-          {/* 1. Running Header Halaman 4 (X = 76px, Y = 45px | Lebar 642px, Tinggi 32px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '45px',
-              width: '642px',
-              height: '32px',
-              borderBottom: '2px solid #1E3A8A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#1E3A8A',
-            }}
-          >
-            <span>E-LKPD MATEMATIKA KELAS VIII: STYLIST STUDIO</span>
-            <span>Halaman 4 dari 5</span>
-          </div>
-
-          {/* 2. Judul Utama Aktivitas 3 (X = 76px, Y = 88px) */}
-          <h3
-            className="activity-h3 m-0"
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '88px',
-              width: '642px',
-              color: '#1E3A8A',
-            }}
-          >
-            3. AKTIVITAS 3: FREKUENSI HARAPAN &amp; EKSPERIMEN FREKUENSI RELATIF
-          </h3>
-
-          {/* 3. Kotak Bagian 3.1: Perhitungan Frekuensi Harapan Teoretis (X = 76px, Y = 125px | Lebar 642px, Tinggi 175px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '125px',
-              width: '642px',
-              height: '175px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h4
-              className="m-0 mb-1"
-              style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}
-            >
-              Bagian 3.1: Perhitungan Frekuensi Harapan Teoretis
-            </h4>
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.3px', lineHeight: 1.42, color: '#0F172A' }}
-            >
-              Target Kejadian <span className="math-var">B</span>: Pasangan Kemeja Merah (M) dan Celana Putih (P) dengan <span className="math-var">n(B)</span> = 1 dan <span className="math-var">n(S)</span> = 6, sehingga <span className="math-var">P(B)</span> = 1/6. Hitung nilai Frekuensi Harapan (<span className="math-var">F_h</span>) untuk <span className="math-var">N</span> = 30 kali percobaan:
-            </p>
-            <div
-              className="flex items-center justify-center gap-2.5 py-1.5 px-4 rounded-xl"
-              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.5px', fontWeight: 700 }}
-            >
-              <span>
-                <span className="math-var">F_h</span> = <span className="math-var">N</span> × <span className="math-var">P(B)</span> = 30 ×
-              </span>
-              <span>(</span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Bagian 3.1 Pembilang P(B)"
-                    value={answers.act31_num}
-                    onChange={(e) => updateAnswer('act31_num', e.target.value)}
-                    className={getFieldClass('act31_num')}
-                    style={{ width: '44px', height: '24px' }}
-                  />
-                </span>
-                <span className="den">
-                  <input
-                    type="text"
-                    aria-label="Bagian 3.1 Penyebut P(B)"
-                    value={answers.act31_den}
-                    onChange={(e) => updateAnswer('act31_den', e.target.value)}
-                    className={getFieldClass('act31_den')}
-                    style={{ width: '44px', height: '24px' }}
-                  />
-                </span>
-              </span>
-              <span>) =</span>
-              <input
-                type="text"
-                aria-label="Bagian 3.1 Hasil Frekuensi Harapan"
-                value={answers.act31_res}
-                onChange={(e) => updateAnswer('act31_res', e.target.value)}
-                className={getFieldClass('act31_res')}
-                style={{ width: '54px', height: '28px' }}
-              />
-              <span>kali</span>
-            </div>
-          </div>
-
-          {/* 4. Kotak Bagian 3.2: Eksperimen Digital (Pengumpulan Data Empiris) (X = 76px, Y = 312px | Lebar 642px, Tinggi 205px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '312px',
-              width: '642px',
-              height: '205px',
-              backgroundColor: '#FDF2F8',
-              border: '2px solid #EC4899',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              overflow: 'hidden',
-            }}
-          >
-            <h4
-              className="m-0 mb-1.5"
-              style={{ fontSize: '15px', fontWeight: 700, color: '#9D174D' }}
-            >
-              Bagian 3.2: Eksperimen Digital (Pengumpulan Data Empiris)
-            </h4>
-            <div style={{ fontSize: '12.6px', lineHeight: 1.4, color: '#0F172A' }} className="space-y-1.5 mb-2">
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <span>
-                  • Tekan tombol &apos;Randomize 30 Kali&apos; pada simulator (atau klik pintas
-                </span>
-                <button
-                  type="button"
-                  onClick={handleRandomizeThirty}
-                  className="bg-[#EC4899] hover:bg-[#9D174D] text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full border border-[#1E293B] cursor-pointer shadow-xs"
-                >
-                  Randomize 30 Kali Sekarang
-                </button>
-                <span>di sini)!</span>
-              </div>
-              <div className="flex items-center gap-1.5 font-semibold whitespace-nowrap">
-                <span>
-                  • Catat kemunculan aktual pasangan (M, P) dari <span className="math-var">N</span> = 30 kali percobaan: muncul sebanyak <span className="math-var">k</span> =
-                </span>
-                <input
-                  type="text"
-                  aria-label="Bagian 3.2 Nilai kemunculan aktual k"
-                  value={answers.act32_k}
-                  onChange={(e) => handleChangeK(e.target.value)}
-                  className={getFieldClass('act32_k')}
-                  style={{ width: '46px', height: '24px' }}
-                />
-                <span>kali.</span>
-              </div>
-            </div>
-
-            {/* Kotak Rumus Frekuensi Relatif (f_r) */}
-            <div
-              className="flex items-center justify-center gap-2.5 py-1 px-4 rounded-xl bg-white border border-[#F472B6]"
-              style={{ fontSize: '14.2px', fontWeight: 700 }}
-            >
-              <span>
-                <span className="math-var">f_r</span> =
-              </span>
-              <span className="fraction">
-                <span className="num math-var">k</span>
-                <span className="den math-var">N</span>
-              </span>
-              <span>=</span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Bagian 3.2 Pembilang Frekuensi Relatif k"
-                    value={answers.act32_num}
-                    onChange={(e) => updateAnswer('act32_num', e.target.value)}
-                    className={getFieldClass('act32_num')}
-                    style={{ width: '46px', height: '23px' }}
-                  />
-                </span>
-                <span className="den">30</span>
-              </span>
-            </div>
-          </div>
-
-          {/* 5. Kotak Bagian 3.3: Menentukan Frekuensi Harapan Menggunakan Frekuensi Relatif (f_r) (X = 76px, Y = 530px | Lebar 642px, Tinggi 185px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '530px',
-              width: '642px',
-              height: '185px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <h4
-              className="m-0 mb-1"
-              style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}
-            >
-              Bagian 3.3: Menentukan Frekuensi Harapan Menggunakan Frekuensi Relatif (<span className="math-var">f_r</span>)
-            </h4>
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.3px', lineHeight: 1.42, color: '#0F172A' }}
-            >
-              Gunakan nilai <span className="math-var">f_r</span> yang didapat pada Bagian 3.2 untuk memprediksi kemunculan pasangan (M, P) jika percobaan diperbesar menjadi <span className="math-var">N</span> = 120 kali:
-            </p>
-            <div
-              className="flex items-center justify-center gap-2 py-1.5 px-3 rounded-xl whitespace-nowrap"
-              style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', fontSize: '14.2px', fontWeight: 700 }}
-            >
-              <span>
-                <span className="math-var">F_h</span>(empiris) = <span className="math-var">N</span> × <span className="math-var">f_r</span> = 120 × (
-              </span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Bagian 3.3 Pembilang k"
-                    value={answers.act33_num}
-                    onChange={(e) => updateAnswer('act33_num', e.target.value)}
-                    className={getFieldClass('act33_num')}
-                    style={{ width: '46px', height: '24px' }}
-                  />
-                </span>
-                <span className="den">30</span>
-              </span>
-              <span>) = 4 ×</span>
-              <input
-                type="text"
-                aria-label="Bagian 3.3 Pengali nilai k"
-                value={answers.act33_mult}
-                onChange={(e) => updateAnswer('act33_mult', e.target.value)}
-                className={getFieldClass('act33_mult')}
-                style={{ width: '46px', height: '26px' }}
-              />
-              <span>=</span>
-              <input
-                type="text"
-                aria-label="Bagian 3.3 Hasil 4k"
-                value={answers.act33_res}
-                onChange={(e) => updateAnswer('act33_res', e.target.value)}
-                className={getFieldClass('act33_res')}
-                style={{ width: '54px', height: '26px' }}
-              />
-              <span>kali</span>
-            </div>
-          </div>
-
-          {/* 6. Kotak Bagian 3.4: Perbandingan, Refleksi Konseptual, & Kesimpulan Terbimbing (X = 76px, Y = 728px | Lebar 642px, Tinggi 325px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '728px',
-              width: '642px',
-              height: '325px',
-              backgroundColor: '#EFF6FF',
-              border: '2px solid #2563EB',
-              borderRadius: '12px',
-              padding: '12px 15px',
-              overflow: 'hidden',
-            }}
-          >
-            <h4
-              className="m-0 mb-1.5"
-              style={{ fontSize: '15px', fontWeight: 700, color: '#1E3A8A' }}
-            >
-              Bagian 3.4: Perbandingan dan Refleksi Konseptual
-            </h4>
-
-            <div className="space-y-2" style={{ fontSize: '13px', lineHeight: 1.48, color: '#0F172A' }}>
-              <div className="bg-white px-3 py-1 rounded-lg border border-[#93C5FD] font-semibold">
-                • Bandingkan pecahan Frekuensi Relatifmu (
-                <span className="font-extrabold text-[#EC4899]">{displayedK}/30</span>
-                ) dengan Peluang Teoretis 1/6 (5/30)!
-              </div>
-
-              <div>
-                <strong>• Kesimpulan Terbimbing 1:</strong> Jumlah seluruh pasangan outfit yang mungkin dibentuk dinamakan{' '}
-                <select
-                  aria-label="Kesimpulan Terbimbing 1 Dropdown 1"
-                  value={answers.act34_drop1}
-                  onChange={(e) => updateAnswer('act34_drop1', e.target.value)}
-                  className={getFieldClass('act34_drop1')}
-                  style={{ width: '160px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
-                >
-                  <option value="">-- Pilih Konsep --</option>
-                  <option value="ruang sampel (S)">ruang sampel (S)</option>
-                  <option value="titik sampel">titik sampel</option>
-                  <option value="kejadian acak">kejadian acak</option>
-                </select>{' '}
-                dengan banyak anggota{' '}
-                <select
-                  aria-label="Kesimpulan Terbimbing 1 Dropdown 2"
-                  value={answers.act34_drop2}
-                  onChange={(e) => updateAnswer('act34_drop2', e.target.value)}
-                  className={getFieldClass('act34_drop2')}
-                  style={{ width: '85px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
-                >
-                  <option value="">-- Pilih --</option>
-                  <option value="n(S)">n(S)</option>
-                  <option value="n(B)">n(B)</option>
-                  <option value="N">N</option>
-                </select>
-                .
-              </div>
-
-              <div>
-                <strong>• Kesimpulan Terbimbing 2:</strong> Perbandingan kemunculan kejadian pada percobaan nyata (<span className="math-var">k</span>) terhadap banyak percobaan (<span className="math-var">N</span>) dinamakan{' '}
-                <select
-                  aria-label="Kesimpulan Terbimbing 2 Dropdown"
-                  value={answers.act34_drop3}
-                  onChange={(e) => updateAnswer('act34_drop3', e.target.value)}
-                  className={getFieldClass('act34_drop3')}
-                  style={{ width: '190px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
-                >
-                  <option value="">-- Pilih Konsep --</option>
-                  <option value="Frekuensi Relatif (f_r)">Frekuensi Relatif (f_r)</option>
-                  <option value="Peluang Teoretis P(B)">Peluang Teoretis P(B)</option>
-                  <option value="Ruang Sampel (S)">Ruang Sampel (S)</option>
-                </select>
-                .
-              </div>
-
-              <div>
-                <strong>• Kesimpulan Terbimbing 3:</strong> Semakin banyak percobaan (<span className="math-var">N</span>) dilakukan, nilai Frekuensi Relatif (<span className="math-var">f_r</span>) akan semakin mendekati nilai{' '}
-                <select
-                  aria-label="Kesimpulan Terbimbing 3 Dropdown 1"
-                  value={answers.act34_drop4}
-                  onChange={(e) => updateAnswer('act34_drop4', e.target.value)}
-                  className={getFieldClass('act34_drop4')}
-                  style={{ width: '180px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
-                >
-                  <option value="">-- Pilih Konsep --</option>
-                  <option value="Peluang Teoretis P(B)">Peluang Teoretis P(B)</option>
-                  <option value="Titik Sampel">Titik Sampel</option>
-                  <option value="Banyak Percobaan N">Banyak Percobaan N</option>
-                </select>
-                , dan keduanya dapat digunakan untuk menentukan{' '}
-                <select
-                  aria-label="Kesimpulan Terbimbing 3 Dropdown 2"
-                  value={answers.act34_drop5}
-                  onChange={(e) => updateAnswer('act34_drop5', e.target.value)}
-                  className={getFieldClass('act34_drop5')}
-                  style={{ width: '190px', height: '25px', padding: '0 4px', fontSize: '12.5px' }}
-                >
-                  <option value="">-- Pilih Konsep --</option>
-                  <option value="Frekuensi Harapan (F_h)">Frekuensi Harapan (F_h)</option>
-                  <option value="Ruang Sampel (S)">Ruang Sampel (S)</option>
-                  <option value="Titik Sampel">Titik Sampel</option>
-                </select>
-                .
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ====================================================================
-            HALAMAN 5: INSTRUMEN EVALUASI PEMAHAMAN (TAHAP 3) & PENILAIAN GURU
-           ==================================================================== */}
-        <section
-          id="halaman-5"
-          className="a4-page"
-          aria-label="Halaman 5: Instrumen Evaluasi Pemahaman & Penilaian Guru"
-        >
-          {/* 1. Running Header Halaman 5 (X = 76px, Y = 45px | Lebar 642px, Tinggi 32px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '45px',
-              width: '642px',
-              height: '32px',
-              borderBottom: '2px solid #1E3A8A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#1E3A8A',
-            }}
-          >
-            <span>E-LKPD MATEMATIKA KELAS VIII: STYLIST STUDIO</span>
-            <span>Halaman 5 dari 5</span>
-          </div>
-
-          {/* 2. Header Bagian Evaluasi (X = 76px, Y = 88px | Lebar 642px, Tinggi 50px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '88px',
-              width: '642px',
-              height: '50px',
-              backgroundColor: '#1E3A8A',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF',
-              fontSize: '16.5px',
-              fontWeight: 700,
-            }}
-          >
-            4. INSTRUMEN SOAL EVALUASI PER TP (TP.K1 &amp; TP.K2)
-          </div>
-
-          {/* 3. Soal 1 (TP.K1 - Pilihan Ganda, X = 76px, Y = 150px | Lebar 642px, Tinggi 175px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '150px',
-              width: '642px',
-              height: '175px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.3px', lineHeight: 1.42, fontWeight: 600 }}
-            >
-              1. <strong>[TP.K1]</strong> Disajikan data 3 kemeja (Merah, Biru, Kuning) dan 2 celana (Putih, Hitam) pada Stylist Studio. Jika dilakukan 60 kali percobaan acak, maka peluang teoretis <span className="math-var">P(A)</span> dan Frekuensi Harapan <span className="math-var">F_h</span> munculnya pasangan Kemeja Merah dan Celana Putih adalah ....
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-[13px]">
-              {[
-                { opt: 'A', text: 'P(A) = 1/5 dan F_h = 12 kali' },
-                { opt: 'B', text: 'P(A) = 1/6 dan F_h = 10 kali' },
-                { opt: 'C', text: 'P(A) = 2/6 dan F_h = 20 kali' },
-                { opt: 'D', text: 'P(A) = 1/6 dan F_h = 30 kali' },
-              ].map((item) => {
-                const selected = answers.eval1_choice === item.opt;
-                const isCorrect = hasChecked && selected && validation.eval1_choice;
-                const isWrong = hasChecked && selected && !validation.eval1_choice;
-                return (
-                  <label
-                    key={item.opt}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 cursor-pointer font-semibold ${
-                      isCorrect
-                        ? 'bg-[#DCFCE7] border-[#16A34A] text-[#15803D]'
-                        : isWrong
-                        ? 'bg-[#FEE2E2] border-[#DC2626] text-[#B91C1C]'
-                        : selected
-                        ? 'bg-[#EFF6FF] border-[#2563EB] text-[#1E3A8A]'
-                        : 'bg-[#FEFCE8] border-dashed border-slate-400'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="eval1_choice"
-                      value={item.opt}
-                      checked={selected}
-                      onChange={() => updateAnswer('eval1_choice', item.opt)}
-                    />
-                    <span>
-                      ({item.opt}) {item.text}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 4. Soal 2 (TP.K1 - Uraian Singkat, X = 76px, Y = 338px | Lebar 642px, Tinggi 160px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '338px',
-              width: '642px',
-              height: '160px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.3px', lineHeight: 1.42, fontWeight: 600 }}
-            >
-              2. <strong>[TP.K1]</strong> Pada simulasi acak 3 kemeja (Merah, Biru, Kuning) dan 2 celana (Putih, Hitam), tentukan Frekuensi Harapan (<span className="math-var">F_h</span>) terambilnya pasangan pakaian yang menggunakan Kemeja Merah jika dilakukan 90 kali percobaan!
-            </p>
-            <div
-              className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl bg-[#F1F5F9] border border-slate-300 whitespace-nowrap"
-              style={{ fontSize: '12.2px', fontWeight: 700 }}
-            >
-              <span>
-                Titik sampel Kemeja Merah = &#123;(M,P), (M,H)&#125; sehingga <span className="math-var">P(A)</span> = 2/6 &rarr; <span className="math-var">F_h</span> = 90 × (
-              </span>
-              <span className="fraction">
-                <span className="num">
-                  <input
-                    type="text"
-                    aria-label="Soal 2 Pembilang P(A)"
-                    value={answers.eval2_num}
-                    onChange={(e) => updateAnswer('eval2_num', e.target.value)}
-                    className={getFieldClass('eval2_num')}
-                    style={{ width: '38px', height: '22px' }}
-                  />
-                </span>
-                <span className="den">
-                  <input
-                    type="text"
-                    aria-label="Soal 2 Penyebut P(A)"
-                    value={answers.eval2_den}
-                    onChange={(e) => updateAnswer('eval2_den', e.target.value)}
-                    className={getFieldClass('eval2_den')}
-                    style={{ width: '38px', height: '22px' }}
-                  />
-                </span>
-              </span>
-              <span>) =</span>
-              <input
-                type="text"
-                aria-label="Soal 2 Hasil F_h"
-                value={answers.eval2_res}
-                onChange={(e) => updateAnswer('eval2_res', e.target.value)}
-                className={getFieldClass('eval2_res')}
-                style={{ width: '46px', height: '25px' }}
-              />
-              <span>kali.</span>
-            </div>
-          </div>
-
-          {/* 5. Soal 3 (TP.K2 - Pilihan Ganda, X = 76px, Y = 510px | Lebar 642px, Tinggi 165px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '510px',
-              width: '642px',
-              height: '165px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <p
-              className="m-0 mb-2"
-              style={{ fontSize: '13.3px', lineHeight: 1.42, fontWeight: 600 }}
-            >
-              3. <strong>[TP.K2]</strong> Dari hasil eksperimen menekan tombol randomize sebanyak 30 kali, tercatat pasangan Kemeja Merah dan Celana Putih muncul sebanyak 6 kali. Nilai Frekuensi Relatif (<span className="math-var">f_r</span>) beserta bentuk sederhananya adalah ....
-            </p>
-            <div className="grid grid-cols-4 gap-2 text-[13px]">
-              {[
-                { opt: 'A', text: '1/6' },
-                { opt: 'B', text: '6/36' },
-                { opt: 'C', text: '6/30 = 1/5' },
-                { opt: 'D', text: '5/30 = 1/6' },
-              ].map((item) => {
-                const selected = answers.eval3_choice === item.opt;
-                const isCorrect = hasChecked && selected && validation.eval3_choice;
-                const isWrong = hasChecked && selected && !validation.eval3_choice;
-                return (
-                  <label
-                    key={item.opt}
-                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg border-2 cursor-pointer font-semibold ${
-                      isCorrect
-                        ? 'bg-[#DCFCE7] border-[#16A34A] text-[#15803D]'
-                        : isWrong
-                        ? 'bg-[#FEE2E2] border-[#DC2626] text-[#B91C1C]'
-                        : selected
-                        ? 'bg-[#EFF6FF] border-[#2563EB] text-[#1E3A8A]'
-                        : 'bg-[#FEFCE8] border-dashed border-slate-400'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="eval3_choice"
-                      value={item.opt}
-                      checked={selected}
-                      onChange={() => updateAnswer('eval3_choice', item.opt)}
-                    />
-                    <span>
-                      ({item.opt}) {item.text}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 6. Soal 4 (TP.K2 - Uraian Terbuka, X = 76px, Y = 688px | Lebar 642px, Tinggi 205px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '688px',
-              width: '642px',
-              height: '205px',
-              backgroundColor: '#FFFFFF',
-              border: '2px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              overflow: 'hidden',
-            }}
-          >
-            <p
-              className="m-0 mb-1.5"
-              style={{ fontSize: '13px', lineHeight: 1.38, fontWeight: 600 }}
-            >
-              4. <strong>[TP.K2]</strong> Berdasarkan data <span className="math-var">f_r</span> = 6/30 = 1/5 pada Soal 3, prediksilah kemunculan kejadian tersebut untuk <span className="math-var">N</span> = 150 kali percobaan, lalu jelaskan analisis keterdekatannya dengan peluang teoretis!
-            </p>
-
-            {/* Baris Hitung Single-Line */}
-            <div
-              className="flex items-center justify-center gap-1 mb-2 bg-[#F1F5F9] px-2 py-1.5 rounded-lg border border-slate-300 whitespace-nowrap"
-              style={{ fontSize: '11.3px', fontWeight: 700 }}
-            >
-              <span>
-                Estimasi <span className="math-var">F_h</span>(empiris) = 150 × (
-              </span>
-              <input
-                type="text"
-                aria-label="Soal 4 Pembilang f_r"
-                value={answers.eval4_num}
-                onChange={(e) => updateAnswer('eval4_num', e.target.value)}
-                className={getFieldClass('eval4_num')}
-                style={{ width: '32px', height: '21px', fontSize: '12px' }}
-              />
-              <span>/</span>
-              <input
-                type="text"
-                aria-label="Soal 4 Penyebut f_r"
-                value={answers.eval4_den}
-                onChange={(e) => updateAnswer('eval4_den', e.target.value)}
-                className={getFieldClass('eval4_den')}
-                style={{ width: '34px', height: '21px', fontSize: '12px' }}
-              />
-              <span>) =</span>
-              <input
-                type="text"
-                aria-label="Soal 4 Hasil F_h empiris"
-                value={answers.eval4_resEmp}
-                onChange={(e) => updateAnswer('eval4_resEmp', e.target.value)}
-                className={getFieldClass('eval4_resEmp')}
-                style={{ width: '36px', height: '21px', fontSize: '12px' }}
-              />
-              <span>
-                kali (sedangkan <span className="math-var">F_h</span> teoretis = 150 × 1/6 =
-              </span>
-              <input
-                type="text"
-                aria-label="Soal 4 Hasil F_h teoretis"
-                value={answers.eval4_resTheo}
-                onChange={(e) => updateAnswer('eval4_resTheo', e.target.value)}
-                className={getFieldClass('eval4_resTheo')}
-                style={{ width: '36px', height: '21px', fontSize: '12px' }}
-              />
-              <span>kali).</span>
-            </div>
-
-            {/* Kotak Textarea Analisis (Lebar 602px, Tinggi 55px) */}
-            <textarea
-              aria-label="Soal 4 Analisis Perbandingan"
-              placeholder="Tuliskan analisis perbandingan dan apa yang terjadi jika percobaan diperbanyak..."
-              value={answers.eval4_analysis}
-              onChange={(e) => updateAnswer('eval4_analysis', e.target.value)}
-              className={getFieldClass('eval4_analysis', 'left-align py-1')}
-              style={{
-                width: '602px',
-                height: '55px',
-                resize: 'none',
-                fontSize: '12.8px',
-                lineHeight: 1.35,
-              }}
-            />
-          </div>
-
-          {/* 7. Panel Skor, Paraf Guru, & Tombol Cetak A4 (X = 76px, Y = 908px | Lebar 642px, Tinggi 145px) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '76px',
-              top: '908px',
-              width: '642px',
-              height: '145px',
-              display: 'flex',
-              alignItems: 'stretch',
-              justifyContent: 'space-between',
-            }}
-          >
-            {/* Kotak Skor & Paraf (Kiri, Lebar 290px) */}
-            <div
-              style={{
-                width: '290px',
-                backgroundColor: '#FFFBEB',
-                border: '2.5px solid #1E3A8A',
-                borderRadius: '12px',
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div
-                data-testid="final-score-box"
-                className="text-center py-2 rounded-lg bg-white border-2 border-[#1E3A8A] font-extrabold text-base text-[#1E3A8A] tabular-nums"
-              >
-                SKOR AKHIR: [ {finalScore} / 100 ]
-              </div>
-              {feedbackBanner && (
-                <div className="text-[11px] font-bold text-center text-[#15803D] leading-tight">
-                  {feedbackBanner}
+                  </div>
                 </div>
-              )}
-              <div className="text-sm font-bold text-[#0F172A] pt-1">
-                Paraf Guru: ....................
+
+                {/* Tengah: Karakter Chibi Perempuan Berganti 6 Pasangan Otomatis Setiap 1 Detik */}
+                <div className="relative z-10 flex flex-col items-center justify-center w-[220px]">
+                  <div
+                    data-testid="cover-outfit-badge"
+                    className="mb-0.5 px-3 py-0.5 rounded-md bg-[#451A03] border-2 border-[#FBBF24] text-[#FEF3C7] text-[10.5px] font-extrabold shadow-sm whitespace-nowrap"
+                  >
+                    Peragaan {coverIndex + 1}/6: {currentCoverOutfit.label}
+                  </div>
+
+                  <PalembangChibiCharacterSvg
+                    top={currentCoverOutfit.top}
+                    bottom={currentCoverOutfit.bottom}
+                    width={162}
+                    height={224}
+                  />
+
+                  <div className="mt-0.5 px-2.5 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[#7F1D1D] text-[10px] font-extrabold text-center whitespace-nowrap">
+                    {currentCoverOutfit.fullTitle}
+                  </div>
+                </div>
+
+                {/* Kanan: Daftar 2 Pilihan Bawahan Kain Tradisional + Info Ruang Sampel */}
+                <div className="relative z-10 w-[184px] bg-[#FFFBEB] border-2 border-[#78350F] rounded-xl p-2 shadow-sm">
+                  <div className="text-[10.5px] font-black text-[#7F1D1D] uppercase tracking-wider border-b border-[#D97706] pb-1 mb-1.5 text-center">
+                    2 Pilihan Bawahan Kain
+                  </div>
+                  <div className="space-y-1.5">
+                    {BOTTOM_OPTIONS.map((b) => {
+                      const active = currentCoverOutfit.bottom === b.code;
+                      return (
+                        <div
+                          key={b.code}
+                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-left transition-all ${
+                            active
+                              ? 'bg-[#9A3412] text-[#FEF3C7] border-[#FBBF24] shadow-sm'
+                              : 'bg-[#FFFDF7] text-[#451A03] border-[#D97706]'
+                          }`}
+                        >
+                          <span
+                            className={`w-6 h-6 rounded flex items-center justify-center font-black text-[10px] shrink-0 ${
+                              active ? 'bg-[#FBBF24] text-[#451A03]' : 'bg-[#FEF3C7] text-[#7F1D1D]'
+                            }`}
+                          >
+                            {b.code}
+                          </span>
+                          <div className="leading-tight">
+                            <div className="text-[10.5px] font-extrabold">{b.shortName}</div>
+                            <div
+                              className={`text-[8.5px] font-semibold ${
+                                active ? 'text-[#FDE68A]' : 'text-[#78350F]'
+                              }`}
+                            >
+                              {b.subtitle}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-2 pt-1.5 border-t border-[#D97706] text-center">
+                    <div className="text-[10px] font-extrabold text-[#451A03]">
+                      Total Kombinasi Busana:
+                    </div>
+                    <div className="text-[12px] font-black text-[#881337]">
+                      3 Atasan × 2 Bawahan = 6 Set
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <TumpalBorderSvg width={636} height={15} />
+            </div>
+
+            {/* 3. Kartu Identitas Kelompok & Kelas */}
+            <div className="w-full bg-[#FFFDF7] border-[2.5px] border-[#78350F] rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-[#7F1D1D] border-b-2 border-[#F59E0B] py-1.5 px-4 text-center">
+                <h2 className="text-[13.5px] font-extrabold text-[#FEF3C7] tracking-wider uppercase">
+                  IDENTITAS KELOMPOK &amp; KELAS
+                </h2>
+              </div>
+
+              <div className="p-3.5 space-y-2 text-[12.5px]">
+                <div className="grid grid-cols-[150px_12px_1fr] items-center">
+                  <label className="font-extrabold text-[#451A03]">Nama Kelompok</label>
+                  <span className="font-bold text-[#451A03]">:</span>
+                  <input
+                    type="text"
+                    value={answers.groupName}
+                    onChange={(e) => updateAnswer('groupName', e.target.value)}
+                    placeholder="Contoh: Kelompok Sriwijaya / Ampera"
+                    className="student-input px-3 py-1 text-[12.5px] w-full"
+                  />
+                </div>
+
+                <div className="grid grid-cols-[150px_12px_1fr] items-center">
+                  <label className="font-extrabold text-[#451A03]">Kelas / Semester</label>
+                  <span className="font-bold text-[#451A03]">:</span>
+                  <input
+                    type="text"
+                    value={answers.classSemester}
+                    onChange={(e) => updateAnswer('classSemester', e.target.value)}
+                    placeholder="VIII (Delapan) / Genap"
+                    className="student-input px-3 py-1 text-[12.5px] w-full"
+                  />
+                </div>
+
+                <div className="pt-0.5">
+                  <div className="font-extrabold text-[#451A03] mb-1">
+                    Anggota Kelompok (Nama Lengkap &amp; Nomor Absen):
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    {(['member1', 'member2', 'member3', 'member4'] as const).map((field, idx) => (
+                      <div key={field} className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded bg-[#881337] text-[#FEF3C7] font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={answers[field]}
+                          onChange={(e) => updateAnswer(field, e.target.value)}
+                          placeholder={`Nama Anggota ${idx + 1}...`}
+                          className="student-input px-2.5 py-1 text-[12px] w-full"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded bg-[#881337] text-[#FEF3C7] font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                      5
+                    </span>
+                    <input
+                      type="text"
+                      value={answers.member5}
+                      onChange={(e) => updateAnswer('member5', e.target.value)}
+                      placeholder="Nama Anggota 5 (Opsional)..."
+                      className="student-input px-2.5 py-1 text-[12px] w-full"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Tombol Aksi (Kanan, Lebar 330px) */}
-            <div
-              style={{
-                width: '330px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                gap: '12px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleCheckAllAnswers}
-                style={{
-                  backgroundColor: '#16A34A',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  border: '2.5px solid #1E293B',
-                  boxShadow: '0 4px 0 #15803D',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  fontSize: '13.5px',
-                }}
-                className="cursor-pointer hover:brightness-105 active:translate-y-0.5 transition-all"
-              >
-                Periksa Semua Jawaban &amp; Mainkan Suara Skor
-              </button>
+            {/* 4. Footer Halaman 1 */}
+            <div className="pt-1 border-t-2 border-[#B45309] flex items-center justify-between text-[11.5px] font-bold text-[#78350F]">
+              <span>E-LKPD Matematika SMP/MTs Kelas VIII – Stylist Studio (Palembang Heritage)</span>
+              <span className="px-2.5 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[#7F1D1D] font-extrabold">
+                Halaman 1 dari 4
+              </span>
+            </div>
+          </div>
+        </section>
 
-              <button
-                type="button"
-                onClick={handlePrintA4}
-                style={{
-                  backgroundColor: '#1E3A8A',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  border: '2.5px solid #1E293B',
-                  boxShadow: '0 4px 0 #0F172A',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  fontSize: '13.5px',
-                }}
-                className="cursor-pointer hover:brightness-110 active:translate-y-0.5 transition-all"
-              >
-                Cetak / Simpan PDF 5 Halaman A4
-              </button>
+        {/* ====================================================================
+            HALAMAN 2: PETUNJUK, CAPAIAN PEMBELAJARAN, & APERSEPSI
+            (Tanpa Bagian "C. Informasi Pendukung")
+            ==================================================================== */}
+        <section id="halaman-2" className="a4-page" aria-label="Halaman 2 Petunjuk Capaian dan Apersepsi">
+          <div
+            style={{
+              position: 'absolute',
+              left: '76px',
+              top: '52px',
+              width: '642px',
+              height: '1019px',
+            }}
+            className="flex flex-col justify-between"
+          >
+            {/* Header Strip Halaman 2 */}
+            <div>
+              <div className="flex items-center justify-between pb-2 border-b-[3px] border-[#7F1D1D]">
+                <div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#9A3412]">
+                    PENGANTAR &amp; APERSEPSI MATERI
+                  </span>
+                  <h2 className="text-[18px] font-black text-[#451A03]">
+                    PETUNJUK PENGGUNAAN, CAPAIAN PEMBELAJARAN, &amp; APERSEPSI
+                  </h2>
+                </div>
+                <span className="px-3 py-1 rounded-md bg-[#7F1D1D] text-[#FEF3C7] border border-[#F59E0B] text-xs font-extrabold">
+                  Hal. 2 / 4
+                </span>
+              </div>
+
+              {/* A. PETUNJUK PENGGUNAAN E-LKPD (6 Poin Ringkas & Jelas) */}
+              <div className="mt-3.5 bg-[#FFFBEB] border-2 border-[#92400E] rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-[#881337] px-4 py-1.5 border-b-2 border-[#F59E0B] flex items-center justify-between">
+                  <h3 className="text-[13.5px] font-extrabold text-[#FEF3C7] tracking-wide">
+                    A. PETUNJUK PENGGUNAAN E-LKPD
+                  </h3>
+                  <span className="text-[10.5px] font-bold text-[#FDE68A]">
+                    6 Langkah Pengerjaan
+                  </span>
+                </div>
+                <div className="p-3.5 grid grid-cols-1 gap-2 text-[12.5px] text-[#291811]">
+                  {[
+                    'Isi identitas kelompok dan nama anggota pada Halaman 1 dengan lengkap.',
+                    'Bacalah setiap instruksi dan permasalahan kontekstual secara berurutan bersama anggota kelompokmu.',
+                    'Pada Halaman 3, klik pilihan kartu Atasan (AG, AP, BH) dan Bawahan (S, J), lalu klik tombol SIMPAN SET PAKAIAN untuk mengisi Tabel Aktivitas 1.',
+                    'Ketik jawaban pada setiap kotak input yang tersedia berdasarkan hasil pengamatan kelompokmu.',
+                    'Pada Halaman 4, gunakan tombol SPIN 1 KALI atau RANDOMIZE 20 KALI untuk melakukan eksperimen 20 percobaan pemasangan pakaian adat secara acak.',
+                    'Klik tombol PERIKSA SEMUA JAWABAN di akhir Halaman 4 untuk melihat skor evaluasi dan unduh hasil pekerjaan dalam format PDF.',
+                  ].map((step, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-[#7F1D1D] text-[#FEF3C7] font-extrabold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <p className="leading-snug font-medium">{step}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* B. CAPAIAN & TUJUAN PEMBELAJARAN (Tanpa Bagian C Informasi Pendukung) */}
+              <div className="mt-3.5 bg-[#FFFDF7] border-2 border-[#78350F] rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-[#451A03] px-4 py-1.5 border-b-2 border-[#F59E0B]">
+                  <h3 className="text-[13.5px] font-extrabold text-[#FEF3C7] tracking-wide">
+                    B. CAPAIAN &amp; TUJUAN PEMBELAJARAN (FASE D KELAS VIII)
+                  </h3>
+                </div>
+                <div className="p-3.5 space-y-2.5 text-[12.5px] text-[#291811]">
+                  <div className="bg-[#FEF3C7] border border-[#D97706] rounded-lg p-2.5">
+                    <div className="font-extrabold text-[#7F1D1D] text-[12px] uppercase">
+                      Capaian Pembelajaran (Elemen Analisis Data dan Peluang):
+                    </div>
+                    <p className="mt-1 leading-relaxed font-medium text-[#451A03]">
+                      Peserta didik dapat menjelaskan dan menggunakan pengertian peluang, frekuensi relatif, dan frekuensi harapan satu kejadian pada suatu percobaan sederhana untuk menyelesaikan masalah kontekstual.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5 pt-0.5">
+                    <div className="bg-[#FFFBEB] border border-[#B45309] rounded-lg p-2.5">
+                      <div className="text-[11px] font-black text-[#881337] uppercase">
+                        1. Peluang Teoretis
+                      </div>
+                      <p className="mt-1 text-[11.5px] leading-snug text-[#451A03]">
+                        Menentukan ruang sampel <span className="math-var">S</span>, titik sampel <span className="math-var">n(S)</span>, dan peluang teoretis <span className="math-var">P(A)</span> dari kombinasi busana adat Palembang.
+                      </p>
+                    </div>
+                    <div className="bg-[#FFFBEB] border border-[#B45309] rounded-lg p-2.5">
+                      <div className="text-[11px] font-black text-[#9A3412] uppercase">
+                        2. Frekuensi Harapan
+                      </div>
+                      <p className="mt-1 text-[11.5px] leading-snug text-[#451A03]">
+                        Menghitung frekuensi harapan <span className="math-var">F_h</span> munculnya suatu pasangan busana pada <span className="math-var">N = 20</span> kali percobaan.
+                      </p>
+                    </div>
+                    <div className="bg-[#FFFBEB] border border-[#B45309] rounded-lg p-2.5">
+                      <div className="text-[11px] font-black text-[#451A03] uppercase">
+                        3. Frekuensi Relatif
+                      </div>
+                      <p className="mt-1 text-[11.5px] leading-snug text-[#451A03]">
+                        Menghitung frekuensi relatif <span className="math-var">F_r</span> dari simulasi Spin 20 percobaan dan membandingkannya dengan peluang teoretis.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* C. APERSEPSI: MENGINGAT KEMBALI MATERI PRASYARAT */}
+              <div className="mt-3.5 bg-[#FFFBEB] border-2 border-[#92400E] rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-[#9A3412] px-4 py-1.5 border-b-2 border-[#F59E0B] flex items-center justify-between">
+                  <h3 className="text-[13.5px] font-extrabold text-[#FEF3C7] tracking-wide">
+                    C. APERSEPSI – MENGINGAT KEMBALI PECAHAN &amp; PERKALIAN
+                  </h3>
+                  <span className="text-[10.5px] font-bold text-[#FDE68A]">
+                    Materi Prasyarat Peluang
+                  </span>
+                </div>
+
+                <div className="p-3.5 space-y-3 text-[12.5px] text-[#291811]">
+                  <p className="leading-snug font-medium text-[#451A03]">
+                    Sebelum bereksplorasi di Butik Digital Palembang Heritage, mari kita ingat kembali cara menuliskan <strong>pecahan bagian dari keseluruhan</strong> serta <strong>perkalian pecahan dengan bilangan bulat</strong>:
+                  </p>
+
+                  {/* Kartu Prasyarat 1 */}
+                  <div className="bg-[#FFFDF7] border border-[#B45309] rounded-xl p-3 space-y-2">
+                    <div className="font-extrabold text-[#7F1D1D] text-[12.5px]">
+                      1. Menyatakan Bagian dari Keseluruhan dalam Bentuk Pecahan
+                    </div>
+                    <div className="text-[11.5px] text-[#78350F] bg-[#FEF3C7] px-2.5 py-1 rounded border border-[#D97706]">
+                      <strong>Ingat:</strong> Nilai Pecahan = (Banyak pilihan yang dimaksud) / (Total seluruh pilihan yang tersedia).
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 pt-1">
+                      <div className="flex items-center justify-between bg-[#FFFBEB] px-3 py-1.5 rounded-lg border border-[#D97706]">
+                        <span className="text-[12px] font-semibold text-[#451A03]">
+                          a. Memilih <strong>1 atasan</strong> (Aesan Gede) dari <strong>3 pilihan atasan adat</strong> yang tersedia:
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold">Pecahan =</span>
+                          <span className="fraction-box">
+                            <input
+                              type="text"
+                              value={answers.ap1_num1}
+                              onChange={(e) => updateAnswer('ap1_num1', e.target.value)}
+                              placeholder="..."
+                              className={getFieldClass('ap1_num1', 'w-10 h-6 text-center text-xs')}
+                            />
+                            <span className="fraction-line" />
+                            <input
+                              type="text"
+                              value={answers.ap1_den1}
+                              onChange={(e) => updateAnswer('ap1_den1', e.target.value)}
+                              placeholder="..."
+                              className={getFieldClass('ap1_den1', 'w-10 h-6 text-center text-xs')}
+                            />
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-[#FFFBEB] px-3 py-1.5 rounded-lg border border-[#D97706]">
+                        <span className="text-[12px] font-semibold text-[#451A03]">
+                          b. Memilih <strong>1 kain bawahan</strong> (Songket) dari <strong>2 pilihan kain bawahan</strong> yang tersedia:
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold">Pecahan =</span>
+                          <span className="fraction-box">
+                            <input
+                              type="text"
+                              value={answers.ap1_num2}
+                              onChange={(e) => updateAnswer('ap1_num2', e.target.value)}
+                              placeholder="..."
+                              className={getFieldClass('ap1_num2', 'w-10 h-6 text-center text-xs')}
+                            />
+                            <span className="fraction-line" />
+                            <input
+                              type="text"
+                              value={answers.ap1_den2}
+                              onChange={(e) => updateAnswer('ap1_den2', e.target.value)}
+                              placeholder="..."
+                              className={getFieldClass('ap1_den2', 'w-10 h-6 text-center text-xs')}
+                            />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Kartu Prasyarat 2 */}
+                  <div className="bg-[#FFFDF7] border border-[#B45309] rounded-xl p-3 space-y-2">
+                    <div className="font-extrabold text-[#7F1D1D] text-[12.5px]">
+                      2. Mengalikan Pecahan dengan Bilangan Bulat (Bekal Menghitung Frekuensi Harapan)
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-0.5">
+                      <div className="flex items-center justify-between bg-[#FFFBEB] px-3 py-2 rounded-lg border border-[#D97706]">
+                        <div className="text-[12px] font-bold text-[#451A03] flex items-center gap-1">
+                          <span>a. Hasil dari</span>
+                          <span className="fraction-box">
+                            <span>1</span>
+                            <span className="fraction-line" />
+                            <span>4</span>
+                          </span>
+                          <span>× 20 =</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={answers.ap2_res1}
+                          onChange={(e) => updateAnswer('ap2_res1', e.target.value)}
+                          placeholder="..."
+                          className={getFieldClass('ap2_res1', 'w-14 h-7 text-center text-xs')}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between bg-[#FFFBEB] px-3 py-2 rounded-lg border border-[#D97706]">
+                        <div className="text-[12px] font-bold text-[#451A03] flex items-center gap-1">
+                          <span>b. Hasil dari</span>
+                          <span className="fraction-box">
+                            <span>1</span>
+                            <span className="fraction-line" />
+                            <span>5</span>
+                          </span>
+                          <span>× 20 =</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={answers.ap2_res2}
+                          onChange={(e) => updateAnswer('ap2_res2', e.target.value)}
+                          placeholder="..."
+                          className={getFieldClass('ap2_res2', 'w-14 h-7 text-center text-xs')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Halaman 2 */}
+            <div className="pt-1 border-t-2 border-[#B45309] flex items-center justify-between text-[11.5px] font-bold text-[#78350F]">
+              <span>E-LKPD Matematika SMP/MTs Kelas VIII – Stylist Studio (Palembang Heritage)</span>
+              <span className="px-2.5 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[#7F1D1D] font-extrabold">
+                Halaman 2 dari 4
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* ====================================================================
+            HALAMAN 3: BUTIK DIGITAL, AKTIVITAS 1 (RUANG SAMPEL), & AKTIVITAS 2 (PELUANG TEORETIS)
+            ==================================================================== */}
+        <section id="halaman-3" className="a4-page" aria-label="Halaman 3 Butik Digital dan Aktivitas 1-2">
+          <div
+            style={{
+              position: 'absolute',
+              left: '76px',
+              top: '46px',
+              width: '642px',
+              height: '1030px',
+            }}
+            className="flex flex-col justify-between"
+          >
+            <div>
+              {/* Header Strip Halaman 3 */}
+              <div className="flex items-center justify-between pb-1.5 border-b-[3px] border-[#7F1D1D]">
+                <div>
+                  <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#9A3412]">
+                    EKSPLORASI KONSEP 1 &amp; 2 • RUANG SAMPEL DAN PELUANG TEORETIS
+                  </span>
+                  <h2 className="text-[17.5px] font-black text-[#451A03]">
+                    SIMULASI BUTIK DIGITAL BUSANA ADAT PALEMBANG
+                  </h2>
+                </div>
+                <span className="px-3 py-1 rounded-md bg-[#7F1D1D] text-[#FEF3C7] border border-[#F59E0B] text-xs font-extrabold">
+                  Hal. 3 / 4
+                </span>
+              </div>
+
+              {/* Instruksi Singkat */}
+              <div className="mt-1.5 bg-[#FEF3C7] border-2 border-[#92400E] rounded-lg px-3 py-1.5 text-[11.5px] text-[#451A03] font-semibold leading-snug">
+                <strong>Cara Kerja:</strong> Klik <strong>1 Atasan</strong> (<span className="font-extrabold text-[#881337]">AG, AP, BH</span>) dan <strong>1 Bawahan</strong> (<span className="font-extrabold text-[#9A3412]">S, J</span>) pada Lemari Butik di kiri, amati perubahan pakaian pada karakter di tengah, lalu klik <strong>SIMPAN SET PAKAIAN</strong> agar pasangan masuk ke <strong>Tabel Aktivitas 1</strong> di sebelah kanan!
+              </div>
+
+              {/* ==================== 3 AREA UTAMA BUTIK DIGITAL (KIRI - TENGAH - KANAN) ==================== */}
+              <div className="mt-2 grid grid-cols-[190px_190px_236px] gap-1.5 bg-[#FFFBEB] border-2 border-[#78350F] rounded-xl p-1.5 shadow-sm">
+                {/* AREA KIRI: LEMARI BUTIK (3 Kartu Atasan + 2 Kartu Bawahan) */}
+                <div className="bg-[#FFFDF7] border-2 border-[#B45309] rounded-lg p-1.5 flex flex-col justify-between">
+                  <div>
+                    <div className="bg-[#7F1D1D] text-[#FEF3C7] text-[10px] font-extrabold uppercase tracking-wider py-0.5 px-2 rounded text-center">
+                      PILIHAN ATASAN (3)
+                    </div>
+                    <div className="mt-1 space-y-1">
+                      {TOP_OPTIONS.map((t, idx) => {
+                        const isSelected = boutiqueTop === t.code;
+                        return (
+                          <button
+                            key={t.code}
+                            type="button"
+                            data-testid={`card-top-${t.code}`}
+                            onClick={() => handleSelectBoutiqueTop(t.code)}
+                            className={`w-full flex items-center gap-1.5 p-1 rounded-lg border-2 text-left transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#FEF3C7] border-[#881337] shadow-sm'
+                                : 'bg-[#FFFDF7] border-[#D97706] hover:bg-[#FFFBEB]'
+                            }`}
+                          >
+                            <TopCardIllustrationSvg code={t.code} width={40} height={40} />
+                            <div className="min-w-0 flex-1 leading-tight">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-black text-[#451A03]">
+                                  {idx + 1}. {t.shortName}
+                                </span>
+                                <span
+                                  className={`px-1 py-0.2 rounded text-[8.5px] font-black shrink-0 ${
+                                    isSelected
+                                      ? 'bg-[#881337] text-[#FEF3C7]'
+                                      : 'bg-[#FDE68A] text-[#78350F]'
+                                  }`}
+                                >
+                                  {t.code}
+                                </span>
+                              </div>
+                              <div className="text-[8.5px] font-bold text-[#9A3412] leading-tight">
+                                {t.subtitle}
+                              </div>
+                              <div className="text-[8px] font-semibold text-[#78350F] leading-tight">
+                                + {t.headpieceNote}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-1.5 pt-1 border-t border-[#D97706]">
+                    <div className="bg-[#9A3412] text-[#FEF3C7] text-[10px] font-extrabold uppercase tracking-wider py-0.5 px-2 rounded text-center">
+                      PILIHAN BAWAHAN (2)
+                    </div>
+                    <div className="mt-1 space-y-1">
+                      {BOTTOM_OPTIONS.map((b, idx) => {
+                        const isSelected = boutiqueBottom === b.code;
+                        return (
+                          <button
+                            key={b.code}
+                            type="button"
+                            data-testid={`card-bottom-${b.code}`}
+                            onClick={() => handleSelectBoutiqueBottom(b.code)}
+                            className={`w-full flex items-center gap-1.5 p-1 rounded-lg border-2 text-left transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#FEF3C7] border-[#9A3412] shadow-sm'
+                                : 'bg-[#FFFDF7] border-[#D97706] hover:bg-[#FFFBEB]'
+                            }`}
+                          >
+                            <BottomCardIllustrationSvg code={b.code} width={40} height={40} />
+                            <div className="min-w-0 flex-1 leading-tight">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-black text-[#451A03]">
+                                  {idx + 1}. {b.shortName}
+                                </span>
+                                <span
+                                  className={`px-1 py-0.2 rounded text-[8.5px] font-black shrink-0 ${
+                                    isSelected
+                                      ? 'bg-[#9A3412] text-[#FEF3C7]'
+                                      : 'bg-[#FDE68A] text-[#78350F]'
+                                  }`}
+                                >
+                                  {b.code}
+                                </span>
+                              </div>
+                              <div className="text-[8.5px] font-bold text-[#78350F] leading-tight">
+                                {b.subtitle}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* AREA TENGAH: PANGGUNG KARAKTER UTAMA + TOMBOL SIMPAN SET PAKAIAN */}
+                <div className="bg-[#FFFDF7] border-2 border-[#B45309] rounded-lg p-1.5 flex flex-col items-center justify-between relative overflow-hidden">
+                  <div className="w-full bg-[#451A03] text-[#FEF3C7] text-[10px] font-extrabold uppercase tracking-wider py-0.5 px-2 rounded text-center">
+                    PERAGA BUSANA ADAT
+                  </div>
+
+                  {/* Status Pasangan yang Sedang Dipilih */}
+                  <div
+                    data-testid="boutique-selected-label"
+                    className="mt-1 px-2 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[10px] font-extrabold text-[#7F1D1D] text-center"
+                  >
+                    {boutiqueTop || boutiqueBottom
+                      ? `Pilihan: (${boutiqueTop ?? '?'}, ${boutiqueBottom ?? '?'})`
+                      : 'Belum memilih pakaian'}
+                  </div>
+
+                  {/* Karakter Chibi Perempuan */}
+                  <div key={boutiquePopKey} className="animate-chibi-pop my-0.5 flex items-center justify-center">
+                    <PalembangChibiCharacterSvg
+                      top={boutiqueTop}
+                      bottom={boutiqueBottom}
+                      width={144}
+                      height={198}
+                    />
+                  </div>
+
+                  {/* Pesan Notifikasi Simpan / Duplikat */}
+                  <div
+                    data-testid="save-outfit-notice"
+                    className={`w-full min-h-[30px] px-1.5 py-0.5 rounded text-[9px] font-extrabold text-center flex items-center justify-center border ${
+                      saveNotice
+                        ? saveNotice.isError
+                          ? 'bg-[#FEE2E2] border-[#B91C1C] text-[#7F1D1D]'
+                          : 'bg-[#DCFCE7] border-[#15803D] text-[#14532D]'
+                        : 'bg-[#FFFBEB] border-[#D97706] text-[#78350F]'
+                    }`}
+                  >
+                    {saveNotice
+                      ? saveNotice.text
+                      : `Tersimpan: ${savedOutfits.length} / 6 kombinasi`}
+                  </div>
+
+                  {/* Tombol SIMPAN SET PAKAIAN */}
+                  <button
+                    type="button"
+                    data-testid="btn-save-outfit"
+                    onClick={handleSaveBoutiqueOutfit}
+                    className="mt-1 w-full py-1.5 px-2 rounded-lg bg-[#881337] hover:bg-[#7F1D1D] active:translate-y-0.5 text-[#FEF3C7] border-2 border-[#FBBF24] font-black text-[10.5px] tracking-wide shadow cursor-pointer transition"
+                  >
+                    SIMPAN SET PAKAIAN
+                  </button>
+                </div>
+
+                {/* AREA KANAN: TABEL AKTIVITAS 1 (3 ATASAN x 2 BAWAHAN) */}
+                <div className="bg-[#FFFDF7] border-2 border-[#B45309] rounded-lg p-1.5 flex flex-col justify-between">
+                  <div className="bg-[#7F1D1D] text-[#FEF3C7] text-[10px] font-extrabold uppercase tracking-wider py-0.5 px-2 rounded text-center">
+                    TABEL AKTIVITAS 1 (RUANG SAMPEL)
+                  </div>
+
+                  <table className="mt-1 w-full border-collapse text-center table-fixed">
+                    <thead>
+                      <tr className="bg-[#FEF3C7] text-[#451A03] text-[9.5px] font-black">
+                        <th className="w-[54px] border-2 border-[#78350F] py-1 px-0.5">
+                          Atasan \ Bawahan
+                        </th>
+                        <th className="border-2 border-[#78350F] py-1 px-1">
+                          Songket (S)
+                        </th>
+                        <th className="border-2 border-[#78350F] py-1 px-1">
+                          Jumputan (J)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {TOP_OPTIONS.map((t) => (
+                        <tr key={t.code}>
+                          <td className="bg-[#FEF3C7] border-2 border-[#78350F] px-1 py-1 font-black text-[9.5px] text-[#7F1D1D] leading-tight">
+                            <div>{t.shortName}</div>
+                            <div className="text-[9px] text-[#92400E]">({t.code})</div>
+                          </td>
+                          {BOTTOM_OPTIONS.map((b) => {
+                            const cellKey: OutfitKey = `${t.code},${b.code}`;
+                            const isSaved = savedOutfits.includes(cellKey);
+                            return (
+                              <td
+                                key={cellKey}
+                                data-testid={`table-cell-${cellKey}`}
+                                className={`border-2 border-[#78350F] p-0.5 h-[100px] align-middle transition ${
+                                  isSaved ? 'bg-[#FFFBEB]' : 'bg-[#F5EBE1]'
+                                }`}
+                              >
+                                {isSaved ? (
+                                  <div className="flex flex-col items-center justify-center">
+                                    <PalembangChibiCharacterSvg
+                                      top={t.code}
+                                      bottom={b.code}
+                                      width={48}
+                                      height={66}
+                                      showShadow={false}
+                                    />
+                                    <span className="mt-0.5 px-1.5 py-0.2 rounded bg-[#881337] text-[#FEF3C7] text-[9px] font-black">
+                                      ({t.code}, {b.code})
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center text-[#92400E]">
+                                    <span className="text-[9.5px] font-extrabold">
+                                      ({t.code}, {b.code})
+                                    </span>
+                                    <span className="text-[8px] font-semibold">
+                                      Belum disimpan
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="mt-1 text-[9.5px] font-bold text-[#78350F] text-center bg-[#FEF3C7] py-0.5 px-1.5 rounded border border-[#D97706]">
+                    Lengkap: <strong className="text-[#881337]">{savedOutfits.length} dari 6</strong> pasangan pakaian adat
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== PERTANYAAN AKTIVITAS 1: RUANG SAMPEL ==================== */}
+              <div className="mt-2 bg-[#FFFDF7] border-2 border-[#78350F] rounded-xl p-2.5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#D97706] pb-1 mb-1.5">
+                  <h3 className="text-[12.5px] font-black text-[#7F1D1D] uppercase">
+                    AKTIVITAS 1: MENEMUKAN RUANG SAMPEL DAN TITIK SAMPEL
+                  </h3>
+                  <span className="text-[10.5px] font-bold text-[#92400E]">
+                    S = &#123;(AG,S), (AG,J), (AP,S), (AP,J), (BH,S), (BH,J)&#125;
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 text-[11.5px] text-[#451A03]">
+                  <div className="flex items-center justify-between bg-[#FFFBEB] px-2.5 py-1.5 rounded-lg border border-[#D97706]">
+                    <span className="font-semibold leading-tight">
+                      1. Banyak seluruh pasangan pakaian adat yang mungkin terbentuk pada ruang sampel <span className="math-var font-bold">n(S)</span> adalah:
+                    </span>
+                    <input
+                      type="text"
+                      value={answers.act1_nS}
+                      onChange={(e) => updateAnswer('act1_nS', e.target.value)}
+                      placeholder="..."
+                      className={getFieldClass('act1_nS', 'w-12 h-7 text-center text-xs shrink-0 ml-2')}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between bg-[#FFFBEB] px-2.5 py-1.5 rounded-lg border border-[#D97706]">
+                    <span className="font-semibold leading-tight">
+                      2. Misalkan kejadian <span className="math-var font-bold">A</span> adalah terpilihnya pasangan <strong>(AG, S)</strong> yaitu <em>Aesan Gede + Songket</em>, maka <span className="math-var font-bold">n(A)</span> =
+                    </span>
+                    <input
+                      type="text"
+                      value={answers.act1_nA}
+                      onChange={(e) => updateAnswer('act1_nA', e.target.value)}
+                      placeholder="..."
+                      className={getFieldClass('act1_nA', 'w-12 h-7 text-center text-xs shrink-0 ml-2')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== AKTIVITAS 2: MENENTUKAN PELUANG TEORETIS ==================== */}
+              <div className="mt-2 bg-[#FFFDF7] border-2 border-[#78350F] rounded-xl p-2.5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[#D97706] pb-1 mb-1.5">
+                  <h3 className="text-[12.5px] font-black text-[#881337] uppercase">
+                    AKTIVITAS 2: MENENTUKAN PELUANG TEORETIS SUATU KEJADIAN
+                  </h3>
+                  <span className="px-2 py-0.5 rounded bg-[#FEF3C7] border border-[#B45309] text-[10.5px] font-extrabold text-[#7F1D1D]">
+                    Rumus: <span className="math-var">P(A) = n(A) / n(S)</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-[255px_1fr] gap-2.5 items-center text-[11.5px] text-[#451A03]">
+                  {/* Perhitungan Pecahan P(A) */}
+                  <div className="bg-[#FFFBEB] border border-[#D97706] rounded-lg px-3 py-1.5 flex items-center justify-between">
+                    <div className="font-bold leading-tight">
+                      <div>Peluang Teoretis</div>
+                      <div className="text-[10.5px] text-[#9A3412]">Kejadian A = (AG, S):</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="math-var font-bold text-[13px]">P(A) =</span>
+                      <span className="fraction-box">
+                        <input
+                          type="text"
+                          value={answers.act2_num}
+                          onChange={(e) => updateAnswer('act2_num', e.target.value)}
+                          placeholder="n(A)"
+                          className={getFieldClass('act2_num', 'w-11 h-6 text-center text-xs')}
+                        />
+                        <span className="fraction-line" />
+                        <input
+                          type="text"
+                          value={answers.act2_den}
+                          onChange={(e) => updateAnswer('act2_den', e.target.value)}
+                          placeholder="n(S)"
+                          className={getFieldClass('act2_den', 'w-11 h-6 text-center text-xs')}
+                        />
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Pertanyaan Pemahaman Aktivitas 2 */}
+                  <div className="bg-[#FFFBEB] border border-[#D97706] rounded-lg px-3 py-1.5">
+                    <label className="block font-bold text-[11px] text-[#7F1D1D] mb-1">
+                      Mengapa setiap kombinasi pakaian adat (AG,S), (AG,J), (AP,S), (AP,J), (BH,S), dan (BH,J) memiliki peluang teoretis yang sama besar?
+                    </label>
+                    <input
+                      type="text"
+                      value={answers.act2_reason}
+                      onChange={(e) => updateAnswer('act2_reason', e.target.value)}
+                      placeholder="Ketik alasanmu (misal: karena setiap pasangan berjumlah 1 dari 6 titik sampel yang sama kemungkinannya)..."
+                      className={getFieldClass('act2_reason', 'w-full px-2.5 py-1 text-[11px]')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Halaman 3 */}
+            <div className="pt-1 border-t-2 border-[#B45309] flex items-center justify-between text-[11.5px] font-bold text-[#78350F]">
+              <span>E-LKPD Matematika SMP/MTs Kelas VIII – Stylist Studio (Palembang Heritage)</span>
+              <span className="px-2.5 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[#7F1D1D] font-extrabold">
+                Halaman 3 dari 4
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* ====================================================================
+            HALAMAN 4: AKTIVITAS 3 (FREKUENSI HARAPAN, SIMULASI SPIN 20 PERCOBAAN,
+            FREKUENSI RELATIF, & PERBANDINGAN) + EVALUASI SKOR AKHIR
+            ==================================================================== */}
+        <section id="halaman-4" className="a4-page" aria-label="Halaman 4 Simulasi Spin 20 Percobaan dan Evaluasi">
+          <div
+            style={{
+              position: 'absolute',
+              left: '76px',
+              top: '42px',
+              width: '642px',
+              height: '1038px',
+            }}
+            className="flex flex-col justify-between"
+          >
+            <div>
+              {/* Header Strip Halaman 4 */}
+              <div className="flex items-center justify-between pb-1.5 border-b-[3px] border-[#7F1D1D]">
+                <div>
+                  <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#9A3412]">
+                    AKTIVITAS 3 • EKSPERIMEN 20 PERCOBAAN ACAK BUSANA ADAT
+                  </span>
+                  <h2 className="text-[17px] font-black text-[#451A03]">
+                    FREKUENSI HARAPAN, SIMULASI SPIN 20 KALI, &amp; FREKUENSI RELATIF
+                  </h2>
+                </div>
+                <span className="px-3 py-1 rounded-md bg-[#7F1D1D] text-[#FEF3C7] border border-[#F59E0B] text-xs font-extrabold">
+                  Hal. 4 / 4
+                </span>
+              </div>
+
+              {/* ==================== BAGIAN 3.1 & 3.3 BERDAMPINGAN ATAU BERURUTAN RINGKAS ==================== */}
+              {/* BAGIAN 3.1: MENGHITUNG FREKUENSI HARAPAN (N = 20) */}
+              <div className="mt-2 bg-[#FFFDF7] border-2 border-[#78350F] rounded-xl px-3 py-2 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11.5px] font-black text-[#7F1D1D] uppercase whitespace-nowrap">
+                    Bagian 3.1 – Menghitung Frekuensi Harapan (<span className="math-var">N = 20</span> Percobaan)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#FEF3C7] border border-[#B45309] text-[10.5px] font-extrabold text-[#451A03] whitespace-nowrap">
+                    Rumus: <span className="math-var">F_h = N × P(A)</span>
+                  </span>
+                </div>
+
+                <div className="mt-1.5 flex items-center justify-between gap-2 bg-[#FFFBEB] border border-[#D97706] rounded-lg px-3 py-1.5 text-[11.5px]">
+                  <span className="font-semibold text-[#451A03]">
+                    Jika roda diputar sebanyak <strong>20 kali</strong> (<span className="math-var">N = 20</span>), frekuensi harapan munculnya pasangan <strong>(AG, S)</strong> adalah:
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="math-var font-bold">F_h =</span>
+                    <input
+                      type="text"
+                      value={answers.act31_N}
+                      onChange={(e) => updateAnswer('act31_N', e.target.value)}
+                      className={getFieldClass('act31_N', 'w-9 h-6 text-center text-xs')}
+                    />
+                    <span className="font-bold">×</span>
+                    <span className="fraction-box">
+                      <input
+                        type="text"
+                        value={answers.act31_num}
+                        onChange={(e) => updateAnswer('act31_num', e.target.value)}
+                        placeholder="1"
+                        className={getFieldClass('act31_num', 'w-9 h-6 text-center text-xs')}
+                      />
+                      <span className="fraction-line" />
+                      <input
+                        type="text"
+                        value={answers.act31_den}
+                        onChange={(e) => updateAnswer('act31_den', e.target.value)}
+                        placeholder="6"
+                        className={getFieldClass('act31_den', 'w-9 h-6 text-center text-xs')}
+                      />
+                    </span>
+                    <span className="font-bold">=</span>
+                    <input
+                      type="text"
+                      value={answers.act31_res}
+                      onChange={(e) => updateAnswer('act31_res', e.target.value)}
+                      placeholder="3,33"
+                      className={getFieldClass('act31_res', 'w-14 h-6 text-center text-xs')}
+                    />
+                    <span className="text-[10px] font-bold text-[#78350F]">kali</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== BAGIAN 3.2: EKSPERIMEN DIGITAL SPIN 20 PERCOBAAN (3 AREA) ==================== */}
+              <div className="mt-2 bg-[#FFFBEB] border-2 border-[#78350F] rounded-xl p-2 shadow-sm">
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-[12px] font-black text-[#881337] uppercase">
+                    Bagian 3.2 – Eksperimen Digital Roda Spin Busana Adat (20 Percobaan)
+                  </span>
+                  <span className="text-[10.5px] font-bold text-[#78350F]">
+                    {spinNotice || 'Klik SPIN 1 KALI atau RANDOMIZE 20 KALI untuk menguji 20 putaran!'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-[172px_228px_214px] gap-2 items-stretch">
+                  {/* AREA KIRI: KARAKTER CHIBI HASIL SPIN */}
+                  <div className="bg-[#FFFDF7] border-2 border-[#B45309] rounded-lg p-1.5 flex flex-col items-center justify-between">
+                    <div className="w-full bg-[#451A03] text-[#FEF3C7] text-[9.5px] font-extrabold uppercase py-0.5 px-2 rounded text-center">
+                      KARAKTER HASIL SPIN
+                    </div>
+
+                    <div
+                      data-testid="spin-result-badge"
+                      className="mt-0.5 px-2 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[9.5px] font-extrabold text-[#7F1D1D] text-center"
+                    >
+                      {spinTop && spinBottom
+                        ? `Terpilih: (${spinTop}, ${spinBottom})`
+                        : 'Pakaian Dasar'}
+                    </div>
+
+                    <div key={spinPopKey} className="animate-chibi-pop flex items-center justify-center">
+                      <PalembangChibiCharacterSvg
+                        top={spinTop}
+                        bottom={spinBottom}
+                        width={126}
+                        height={176}
+                      />
+                    </div>
+
+                    <div className="w-full text-[9px] font-bold text-[#78350F] text-center bg-[#FFFBEB] py-0.5 px-1 rounded border border-[#D97706]">
+                      {spinTop && spinBottom
+                        ? ALL_OUTFITS.find((o) => o.key === `${spinTop},${spinBottom}`)?.fullTitle
+                        : 'Menunggu putaran roda...'}
+                    </div>
+                  </div>
+
+                  {/* AREA TENGAH: RODA SPIN 6 SEKTOR + 3 TOMBOL KONTROL */}
+                  <div className="bg-[#FFFDF7] border-2 border-[#B45309] rounded-lg p-1.5 flex flex-col items-center justify-between">
+                    <div className="w-full bg-[#881337] text-[#FEF3C7] text-[9.5px] font-extrabold uppercase py-0.5 px-2 rounded text-center">
+                      RODA SPIN 6 PASANGAN ADAT
+                    </div>
+
+                    <div className="my-1 flex items-center justify-center">
+                      <PalembangSpinWheelSvg angle={wheelAngle} size={166} />
+                    </div>
+
+                    {/* 3 Tombol Kontrol Simulasi */}
+                    <div className="w-full space-y-1">
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          data-testid="btn-spin-1"
+                          onClick={handleSpinOnce}
+                          disabled={isAutoSpinning}
+                          className="py-1 px-1.5 rounded bg-[#9A3412] hover:bg-[#7F1D1D] text-[#FEF3C7] border border-[#FBBF24] font-extrabold text-[10px] cursor-pointer transition disabled:opacity-50"
+                        >
+                          SPIN 1 KALI
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="btn-reset-data"
+                          onClick={handleResetSpin}
+                          className="py-1 px-1.5 rounded bg-[#451A03] hover:bg-[#291811] text-[#FDE68A] border border-[#B45309] font-extrabold text-[10px] cursor-pointer transition"
+                        >
+                          RESET DATA
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        data-testid="btn-randomize-20"
+                        onClick={handleRandomizeTwenty}
+                        disabled={isAutoSpinning}
+                        className="w-full py-1.5 px-2 rounded bg-[#F59E0B] hover:bg-[#D97706] text-[#451A03] border-2 border-[#78350F] font-black text-[10.5px] tracking-wide shadow-sm cursor-pointer transition disabled:opacity-60"
+                      >
+                        {isAutoSpinning ? 'MEMUTAR 20 KALI...' : 'RANDOMIZE 20 KALI'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* AREA KANAN: TABEL STATISTIK REAL-TIME */}
+                  <div className="bg-[#FFFDF7] border-2 border-[#B45309] rounded-lg p-1.5 flex flex-col justify-between">
+                    <div className="bg-[#7F1D1D] text-[#FEF3C7] text-[9.5px] font-extrabold uppercase py-0.5 px-2 rounded text-center">
+                      TABEL STATISTIK REAL-TIME
+                    </div>
+
+                    <table className="mt-1 w-full border-collapse text-[10px]">
+                      <thead>
+                        <tr className="bg-[#FEF3C7] text-[#451A03] font-black">
+                          <th className="border border-[#78350F] py-1 px-1.5 text-left">
+                            Pasangan Pakaian
+                          </th>
+                          <th className="border border-[#78350F] py-1 px-1 text-center w-[68px]">
+                            Frekuensi (k)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ALL_OUTFITS.map((item) => {
+                          const isHighlighted = item.key === 'AG,S';
+                          return (
+                            <tr
+                              key={item.key}
+                              className={isHighlighted ? 'bg-[#FEF3C7] font-extrabold' : 'bg-[#FFFDF7]'}
+                            >
+                              <td className="border border-[#78350F] py-1 px-1.5 text-[#451A03]">
+                                <span className="font-black text-[#881337]">{item.label}</span>{' '}
+                                <span className="text-[8.5px] text-[#78350F]">{item.fullTitle}</span>
+                              </td>
+                              <td
+                                data-testid={`stat-${item.key}`}
+                                className="border border-[#78350F] py-1 px-1 text-center font-black text-[11px] text-[#7F1D1D]"
+                              >
+                                {stats[item.key]}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-[#451A03] text-[#FEF3C7] font-black">
+                          <td className="border border-[#451A03] py-1 px-1.5">
+                            Total Percobaan (N)
+                          </td>
+                          <td
+                            data-testid="stat-total-trials"
+                            className="border border-[#451A03] py-1 px-1 text-center text-[#FDE047] text-[11.5px]"
+                          >
+                            {totalTrials}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+
+                    <div className="mt-1 text-[8.5px] font-bold text-[#78350F] text-center">
+                      Target Eksperimen: <strong>N = 20 Percobaan</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== BAGIAN 3.3: MENGHITUNG FREKUENSI RELATIF (N = 20) ==================== */}
+              <div className="mt-2 bg-[#FFFDF7] border-2 border-[#78350F] rounded-xl px-3 py-2 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11.5px] font-black text-[#9A3412] uppercase whitespace-nowrap">
+                    Bagian 3.3 – Menghitung Frekuensi Relatif Hasil Percobaan (<span className="math-var">N = 20</span>)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#FEF3C7] border border-[#B45309] text-[10.5px] font-extrabold text-[#451A03] whitespace-nowrap">
+                    Rumus: <span className="math-var">F_r = k / N</span>
+                  </span>
+                </div>
+
+                <div className="mt-1.5 flex items-center justify-between gap-2 bg-[#FFFBEB] border border-[#D97706] rounded-lg px-3 py-1.5 text-[11.5px]">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-[#451A03]">
+                      Berdasarkan tabel di atas, pasangan <strong>(AG, S)</strong> muncul sebanyak <span className="math-var font-bold">k</span> =
+                    </span>
+                    <input
+                      type="text"
+                      value={answers.act33_k}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setAnswers((prev) => ({
+                          ...prev,
+                          act33_k: val,
+                          act33_num: val,
+                        }));
+                      }}
+                      placeholder="k"
+                      className={getFieldClass('act33_k', 'w-10 h-6 text-center text-xs')}
+                    />
+                    <span className="font-semibold text-[#451A03]">
+                      kali dari <span className="math-var font-bold">N</span> =
+                    </span>
+                    <input
+                      type="text"
+                      value={answers.act33_N}
+                      onChange={(e) => updateAnswer('act33_N', e.target.value)}
+                      className={getFieldClass('act33_N', 'w-10 h-6 text-center text-xs')}
+                    />
+                    <span className="font-semibold text-[#451A03]">percobaan.</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="math-var font-bold">F_r =</span>
+                    <span className="fraction-box">
+                      <input
+                        type="text"
+                        value={answers.act33_num}
+                        onChange={(e) => updateAnswer('act33_num', e.target.value)}
+                        placeholder="k"
+                        className={getFieldClass('act33_num', 'w-10 h-6 text-center text-xs')}
+                      />
+                      <span className="fraction-line" />
+                      <input
+                        type="text"
+                        value={answers.act33_den}
+                        onChange={(e) => updateAnswer('act33_den', e.target.value)}
+                        placeholder="20"
+                        className={getFieldClass('act33_den', 'w-10 h-6 text-center text-xs')}
+                      />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== BAGIAN 3.4: MEMBANDINGKAN HASIL PERCOBAAN ==================== */}
+              <div className="mt-2 bg-[#FFFDF7] border-2 border-[#78350F] rounded-xl px-3 py-2 shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11.5px] font-black text-[#451A03] uppercase">
+                    Bagian 3.4 – Membandingkan Peluang Teoretis (<span className="math-var">P(A) = 1/6</span>) &amp; Frekuensi Relatif (<span className="math-var">F_r = k/20</span>)
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] text-[#451A03]">
+                  <div className="grid grid-cols-[245px_1fr] items-center gap-2">
+                    <label className="font-bold text-[#7F1D1D]">
+                      1. Apakah ke-6 pasangan selalu muncul dengan jumlah sama?
+                    </label>
+                    <input
+                      type="text"
+                      value={answers.act34_q1}
+                      onChange={(e) => updateAnswer('act34_q1', e.target.value)}
+                      placeholder="Contoh: Tidak selalu sama, karena hasil putaran bervariasi..."
+                      className={getFieldClass('act34_q1', 'px-2 py-1 text-[11px] w-full')}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-[245px_1fr] items-center gap-2">
+                    <label className="font-bold text-[#7F1D1D]">
+                      2. Mengapa hasil percobaan berbeda dari frekuensi harapan?
+                    </label>
+                    <input
+                      type="text"
+                      value={answers.act34_q2}
+                      onChange={(e) => updateAnswer('act34_q2', e.target.value)}
+                      placeholder="Contoh: Karena frekuensi harapan adalah prediksi teoretis sedangkan percobaan bersifat acak..."
+                      className={getFieldClass('act34_q2', 'px-2 py-1 text-[11px] w-full')}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-[245px_1fr] items-center gap-2">
+                    <label className="font-bold text-[#7F1D1D]">
+                      3. Bagaimana hubungan <span className="math-var">P(A)</span>, <span className="math-var">F_h</span>, dan <span className="math-var">F_r</span>?
+                    </label>
+                    <input
+                      type="text"
+                      value={answers.act34_q3}
+                      onChange={(e) => updateAnswer('act34_q3', e.target.value)}
+                      placeholder="Contoh: Semakin banyak percobaan N dilakukan, nilai Fr akan semakin mendekati P(A)..."
+                      className={getFieldClass('act34_q3', 'px-2 py-1 text-[11px] w-full')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== PANEL EVALUASI SKOR AKHIR & TOMBOL AKSI ==================== */}
+              <div className="mt-2 bg-[#451A03] border-2 border-[#F59E0B] rounded-xl px-3.5 py-2 text-[#FEF3C7] shadow-md">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      data-testid="final-score-box"
+                      className="px-3 py-1 rounded-lg bg-[#881337] border-2 border-[#FBBF24] text-center shrink-0"
+                    >
+                      <div className="text-[9px] font-bold uppercase text-[#FDE68A]">Skor Akhir</div>
+                      <div className="text-[18px] font-black text-[#FEF3C7] leading-none">
+                        {hasChecked ? finalScore : '--'}/100
+                      </div>
+                    </div>
+                    <div className="text-[10.5px] leading-snug text-[#FDE68A] max-w-[260px]">
+                      {feedbackBanner ||
+                        'Pastikan semua jawaban pada Halaman 2, 3, dan 4 serta 6 sel Tabel Aktivitas 1 telah terisi.'}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      data-testid="btn-check-answers"
+                      onClick={handleCheckAnswers}
+                      className="px-3 py-2 rounded-lg bg-[#F59E0B] hover:bg-[#D97706] text-[#451A03] border-2 border-[#FEF3C7] font-black text-[11px] cursor-pointer transition shadow"
+                    >
+                      PERIKSA SEMUA JAWABAN
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="btn-download-pdf"
+                      onClick={handleDownloadPdf}
+                      disabled={isDownloadingPdf}
+                      className="px-3 py-2 rounded-lg bg-[#881337] hover:bg-[#991B1B] text-[#FEF3C7] border-2 border-[#FBBF24] font-black text-[11px] cursor-pointer transition shadow disabled:opacity-60"
+                    >
+                      {isDownloadingPdf ? 'MENYIAPKAN PDF...' : 'DOWNLOAD PDF 4 HALAMAN'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Halaman 4 */}
+            <div className="pt-1 border-t-2 border-[#B45309] flex items-center justify-between text-[11.5px] font-bold text-[#78350F]">
+              <span>E-LKPD Matematika SMP/MTs Kelas VIII – Stylist Studio (Palembang Heritage)</span>
+              <span className="px-2.5 py-0.5 rounded bg-[#FEF3C7] border border-[#92400E] text-[#7F1D1D] font-extrabold">
+                Halaman 4 dari 4
+              </span>
             </div>
           </div>
         </section>

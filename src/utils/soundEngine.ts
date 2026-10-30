@@ -134,6 +134,14 @@ class SoundEngine {
     return this.bgmEnabled;
   }
 
+  public playSuccessChime(): void {
+    this.playCheckAnswerSfx(true);
+  }
+
+  public setSfxEnabled(enabled: boolean): void {
+    this.sfxEnabled = enabled;
+  }
+
   public toggleSfx(forceState?: boolean): boolean {
     this.sfxEnabled = forceState !== undefined ? forceState : !this.sfxEnabled;
     if (this.sfxEnabled) {
